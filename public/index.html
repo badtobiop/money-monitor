@@ -10,6 +10,16 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <!-- Google Identity Services (One-Tap & Sign-In) -->
+        <!-- Immediate Google Identity Services Callback Buffer (Prevents race conditions) -->
+    <script>
+        window.handleGoogleLogin = function(response) {
+            if (window._handleGoogleLoginImpl) {
+                window._handleGoogleLoginImpl(response);
+            } else {
+                window._pendingGoogleResponse = response;
+            }
+        };
+    </script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Favicons & App Icons -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2">
@@ -96,7 +106,7 @@
                      data-type="standard" 
                      data-shape="pill" 
                      data-theme="outline" 
-                     data-text="signin_with" 
+                     data-text="continue_with" 
                      data-size="large" 
                      data-logo_alignment="left"
                      data-width="320">

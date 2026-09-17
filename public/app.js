@@ -185,7 +185,7 @@ window.setAuthMode = function(mode) {
 };
 
 // ==================== GOOGLE ONE-TAP & SIGN-IN HANDLER ====================
-window.handleGoogleLogin = async function(response) {
+window._handleGoogleLoginImpl = async function(response) {
     if (!response || !response.credential) {
         console.error('Google response missing credential');
         return;
@@ -193,7 +193,7 @@ window.handleGoogleLogin = async function(response) {
 
     if (authError) authError.style.display = 'none';
     if (authSuccess) {
-        authSuccess.innerHTML = '<div style="display:flex;align-items:center;gap:8px;"><span>⚡</span> Authenticating with Google account...</div>';
+        authSuccess.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 14px;background:rgba(244,63,94,0.12);border:1px solid rgba(244,63,94,0.3);border-radius:12px;color:#fda4af;font-weight:600;font-size:0.86rem;"><span style="display:inline-block;width:16px;height:16px;border:2px solid rgba(253,164,175,0.3);border-top-color:#fda4af;border-radius:50%;animation:spin 0.8s linear infinite;"></span> Authenticating with Google account...</div>';
         authSuccess.style.display = 'block';
     }
 
@@ -220,13 +220,13 @@ window.handleGoogleLogin = async function(response) {
         localStorage.setItem('aura_user', JSON.stringify(currentUser));
 
         if (authSuccess) {
-            authSuccess.innerHTML = `<div style="font-weight:700;color:#047857;">🎉 Welcome, ${escapeHtml(currentUser.name)}! Opening Dashboard...</div>`;
+            authSuccess.innerHTML = `<div style="font-weight:700;color:#10b981;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 14px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:12px;font-size:0.88rem;">🎉 Welcome, ${escapeHtml(currentUser.name)}! Opening Dashboard...</div>`;
             authSuccess.style.display = 'block';
         }
 
         setTimeout(() => {
             initAppForUser();
-        }, 500);
+        }, 400);
 
     } catch (err) {
         console.error('Google login fetch error:', err);
@@ -237,6 +237,13 @@ window.handleGoogleLogin = async function(response) {
         if (authSuccess) authSuccess.style.display = 'none';
     }
 };
+window.handleGoogleLogin = window._handleGoogleLoginImpl;
+
+// If a Google response arrived before app.js loaded, process it immediately
+if (window._pendingGoogleResponse) {
+    window._handleGoogleLoginImpl(window._pendingGoogleResponse);
+    delete window._pendingGoogleResponse;
+}
 
 // Bottom Toggle Function
 window.toggleAuthMode = function() {
@@ -464,66 +471,27 @@ authForm.addEventListener('submit', async (e) => {
 
 // Logout Handler (can optionally open directly to 'signup' or 'login')
 window.logout = function(targetMode = 'login') {
+    // 1. Clear local user session
     localStorage.removeItem('aura_user');
     currentUser = null;
 
-    // === Google GIS Sign-Out Fix ===
-    // 1. disableAutoSelect: stops Google from auto-selecting the previously used account
-    // 2. revoke: clears the session hint so user can pick any account next time
+    // 2. Disable auto-select in Google Identity Services so Google doesn't silently re-login
     if (window.google && window.google.accounts && window.google.accounts.id) {
         try {
             window.google.accounts.id.disableAutoSelect();
         } catch(e) {}
     }
 
-    // Re-render the Google button from scratch to show full account picker popup
-    const googleWrapper = document.getElementById('google-signin-wrapper');
-    if (googleWrapper) {
-        const oldBtn = googleWrapper.querySelector('.g_id_signin');
-        if (oldBtn) {
-            oldBtn.remove();
-        }
-        // Recreate the button element fresh
-        const newBtn = document.createElement('div');
-        newBtn.className = 'g_id_signin';
-        newBtn.setAttribute('data-type', 'standard');
-        newBtn.setAttribute('data-shape', 'pill');
-        newBtn.setAttribute('data-theme', 'outline');
-        newBtn.setAttribute('data-text', 'signin_with');
-        newBtn.setAttribute('data-size', 'large');
-        newBtn.setAttribute('data-logo_alignment', 'left');
-        newBtn.setAttribute('data-width', '320');
-        googleWrapper.appendChild(newBtn);
-
-        // Re-initialize Google Sign-In with select_account prompt (forces account picker)
-        if (window.google && window.google.accounts && window.google.accounts.id) {
-            window.google.accounts.id.initialize({
-                client_id: '786991397900-g07b4v23aa9sb1f5j57184f0qrvgs84v.apps.googleusercontent.com',
-                callback: window.handleGoogleLogin,
-                ux_mode: 'popup',
-                prompt_parent_id: undefined,
-                auto_select: false,
-                context: 'signin'
-            });
-            window.google.accounts.id.renderButton(newBtn, {
-                type: 'standard',
-                shape: 'pill',
-                theme: 'outline',
-                text: 'signin_with',
-                size: 'large',
-                logo_alignment: 'left',
-                width: 320
-            });
-        }
+    // 3. Save targetMode in sessionStorage (e.g. if 'signup' or 'login' was requested)
+    if (targetMode === 'signup') {
+        sessionStorage.setItem('aura_auth_mode', 'signup');
+    } else {
+        sessionStorage.removeItem('aura_auth_mode');
     }
-    // === End Google Fix ===
 
-    dashboardApp.style.display = 'none';
-    authModal.style.display = 'flex';
-    authEmail.value = '';
-    authPassword.value = '';
-    authName.value = '';
-    setAuthMode(targetMode);
+    // 4. Instant clean redirect to login screen
+    // This resets the Google GIS library, avoids iframe desync, and enables the Google account switcher!
+    window.location.replace('/');
 };
 
 document.getElementById('logout-btn')?.addEventListener('click', () => window.logout('login'));
@@ -620,7 +588,13 @@ async function checkAuth() {
     // Show Auth Modal
     authModal.style.display = 'flex';
     dashboardApp.style.display = 'none';
-    setAuthMode('login');
+    const postLogoutMode = sessionStorage.getItem('aura_auth_mode');
+    if (postLogoutMode) {
+        sessionStorage.removeItem('aura_auth_mode');
+        setAuthMode(postLogoutMode);
+    } else {
+        setAuthMode('login');
+    }
 }
 
 function initAppForUser() {
