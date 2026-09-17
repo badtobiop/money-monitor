@@ -72,6 +72,9 @@ body::-webkit-scrollbar {
 /* Elements where scrollbar line is hidden but native scrolling is 100% active */
 .content-viewport,
 .table-container,
+.leakage-items-list,
+.leakage-advisor-card,
+.leakage-breakdown,
 .upcoming-bills-list,
 .drawer-messages,
 .ticket-list,
@@ -87,6 +90,9 @@ textarea {
 
 .content-viewport::-webkit-scrollbar,
 .table-container::-webkit-scrollbar,
+.leakage-items-list::-webkit-scrollbar,
+.leakage-advisor-card::-webkit-scrollbar,
+.leakage-breakdown::-webkit-scrollbar,
 .upcoming-bills-list::-webkit-scrollbar,
 .drawer-messages::-webkit-scrollbar,
 .ticket-list::-webkit-scrollbar,
@@ -1408,12 +1414,34 @@ body {
     color: var(--text-subtle);
 }
 
+/* MONTHLY LEAKAGE LIST: Scrolling 100% active, scrollbar lines completely hidden */
 .leakage-items-list {
     display: flex;
     flex-direction: column;
     gap: 10px;
     max-height: 190px;
-    overflow-y: auto;
+    overflow-y: auto !important;
+    overflow-x: hidden !important; /* Completely removes bottom horizontal scroll line */
+    scrollbar-width: none !important; /* Hides Firefox scrollbar */
+    -ms-overflow-style: none !important; /* Hides Edge/IE scrollbar */
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    padding-right: 2px;
+}
+
+.leakage-items-list::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+}
+
+.leakage-items-list::-webkit-scrollbar-track,
+.leakage-items-list::-webkit-scrollbar-thumb,
+.leakage-items-list::-webkit-scrollbar-corner {
+    display: none !important;
+    background: transparent !important;
+    border: none !important;
 }
 
 .leakage-item {
@@ -1434,7 +1462,7 @@ body {
 .leakage-item:hover {
     background: rgba(255, 255, 255, 0.88);
     border-color: rgba(244, 63, 94, 0.4);
-    transform: translateX(4px);
+    transform: translateY(-2px); /* Lift without pushing horizontally to avoid bottom scroll line */
     box-shadow: 0 6px 18px rgba(225, 29, 72, 0.1);
 }
 
