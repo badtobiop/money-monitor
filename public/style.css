@@ -218,18 +218,18 @@ body {
 
 .auth-banner-container {
     width: 100%;
-    margin-bottom: 16px;
-    border-radius: 14px;
+    margin-bottom: 14px;
+    border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 8px 24px rgba(244, 63, 94, 0.22), 0 2px 8px rgba(0, 0, 0, 0.2);
-    border: 1px solid rgba(244, 63, 94, 0.35);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), 0 0 10px rgba(244, 63, 94, 0.15);
+    border: 1px solid rgba(244, 63, 94, 0.3);
     background: #0d0407;
 }
 
 .auth-banner-img {
     width: 100%;
-    height: auto;
-    max-height: 130px;
+    height: 82px;
+    max-height: 85px;
     object-fit: cover;
     display: block;
 }
@@ -518,58 +518,57 @@ body {
     display: flex;
     justify-content: center;
     width: 100%;
-    margin: 14px 0 16px 0;
+    margin: 10px 0 14px 0;
 }
 
 .custom-google-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 12px;
+    gap: 10px;
     width: 100%;
-    max-width: 340px;
-    height: 48px;
+    height: 42px;
     background: #ffffff;
-    color: #1f2937;
-    border: 1.5px solid rgba(225, 29, 72, 0.28);
-    border-radius: 50px;
-    font-size: 0.94rem;
-    font-weight: 700;
-    letter-spacing: -0.2px;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    letter-spacing: -0.1px;
     cursor: pointer;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.9);
-    transition: all 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    transition: all 0.2s cubic-bezier(0.2, 1, 0.3, 1);
     position: relative;
-    overflow: hidden;
+    box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
     user-select: none;
 }
 
-/* Premium Crimson Glow Hover Effect */
+/* Refined, Clean Hover Effect with Subtle Border Glow */
 .custom-google-btn:hover {
-    transform: translateY(-2px) scale(1.015);
-    border-color: rgba(225, 29, 72, 0.7);
-    box-shadow: 
-        0 8px 24px rgba(225, 29, 72, 0.28),
-        0 0 16px rgba(244, 63, 94, 0.35),
-        0 0 0 3px rgba(244, 63, 94, 0.12);
-    background: #ffffff;
+    transform: translateY(-1px);
+    background: #f8fafc;
+    border-color: #94a3b8;
     color: #0f172a;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px #94a3b8;
 }
 
 /* Tactile Active Press Effect */
 .custom-google-btn:active {
-    transform: translateY(0) scale(0.985);
-    box-shadow: 0 3px 10px rgba(225, 29, 72, 0.22);
+    transform: translateY(0);
+    background: #f1f5f9;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .google-svg-icon {
+    width: 18px;
+    height: 18px;
     flex-shrink: 0;
-    transition: transform 0.28s ease;
+    transition: transform 0.2s ease;
 }
 
 .custom-google-btn:hover .google-svg-icon {
-    transform: scale(1.12) rotate(-4deg);
+    transform: scale(1.08);
 }
 
 .google-btn-text {
