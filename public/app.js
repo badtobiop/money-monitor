@@ -604,8 +604,8 @@ async function checkResetTokenInUrl() {
 
     if (token) {
         activeResetToken = token;
-        dashboardApp.style.display = 'none';
-        authModal.style.display = 'flex';
+        dashboardApp.style.setProperty('display', 'none', 'important');
+        authModal.style.setProperty('display', 'flex', 'important');
 
         authSubmitBtn.disabled = true;
         authSubmitBtn.innerText = 'Verifying security link... ⏳';
@@ -688,8 +688,8 @@ async function checkAuth() {
 }
 
 function initAppForUser() {
-    authModal.style.display = 'none';
-    dashboardApp.style.display = 'flex';
+    authModal.style.setProperty('display', 'none', 'important');
+    dashboardApp.style.setProperty('display', 'flex', 'important');
 
     // Populate Sidebar User Profile
     const initials = (currentUser.name || 'User').charAt(0).toUpperCase();
@@ -1239,6 +1239,17 @@ function closeDrawer() {
 aiFabBtn.addEventListener('click', openDrawer);
 drawerCloseBtn.addEventListener('click', closeDrawer);
 
+// Smooth Auto-Scroll Helper for AI Chat
+function scrollChatToBottom(smooth = true) {
+    if (!drawerChatBox) return;
+    requestAnimationFrame(() => {
+        drawerChatBox.scrollTo({
+            top: drawerChatBox.scrollHeight + 150,
+            behavior: smooth ? 'smooth' : 'auto'
+        });
+    });
+}
+
 // Append Chat Message
 function appendDrawerMessage(text, isUser) {
     const div = document.createElement('div');
@@ -1250,7 +1261,7 @@ function appendDrawerMessage(text, isUser) {
     div.innerHTML = formatted;
 
     drawerChatBox.appendChild(div);
-    drawerChatBox.scrollTop = drawerChatBox.scrollHeight;
+    scrollChatToBottom(true);
 }
 
 // Send Message to Gemini AI Agent
@@ -1286,6 +1297,9 @@ async function sendDrawerMessage(customText = null) {
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/\n/g, '<br>');
 
+        scrollChatToBottom(true);
+        setTimeout(() => scrollChatToBottom(true), 60);
+
         // Non-blocking real-time background sync so UI responds instantly
         refreshAllData().catch(e => console.error(e));
     } catch (err) {
@@ -1314,6 +1328,66 @@ function escapeHtml(str) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 }
+
+
+// ==================== AUTO-SCROLL OBSERVER & MOBILE KEYBOARD HANDLER ====================
+// 1. MutationObserver: automatically scrolls chat down whenever any new bubble or text arrives
+if (window.MutationObserver && drawerChatBox) {
+    const chatObserver = new MutationObserver(() => {
+        scrollChatToBottom(true);
+    });
+    chatObserver.observe(drawerChatBox, { childList: true, subtree: true, characterData: true });
+}
+
+// 2. Mobile Visual Viewport: Pushes the AI chat input row UP above the on-screen keyboard
+if (window.visualViewport) {
+    const syncDrawerWithKeyboard = () => {
+        const aiDrawer = document.getElementById('ai-drawer');
+        if (!aiDrawer || !aiDrawer.classList.contains('open')) return;
+
+        // When keyboard opens, visualViewport.height shrinks
+        const vpHeight = window.visualViewport.height;
+        const screenHeight = window.innerHeight;
+
+        if (screenHeight - vpHeight > 100) {
+            // Keyboard is OPEN: pin drawer to visual viewport height
+            aiDrawer.style.height = `${vpHeight}px`;
+            scrollChatToBottom(false);
+        } else {
+            // Keyboard is CLOSED
+            aiDrawer.style.height = '';
+        }
+    };
+
+    window.visualViewport.addEventListener('resize', syncDrawerWithKeyboard);
+    window.visualViewport.addEventListener('scroll', syncDrawerWithKeyboard);
+}
+
+// Focus handler for mobile input
+if (drawerInput) {
+    drawerInput.addEventListener('focus', () => {
+        setTimeout(() => {
+            if (window.visualViewport) {
+                const aiDrawer = document.getElementById('ai-drawer');
+                if (aiDrawer) {
+                    aiDrawer.style.height = `${window.visualViewport.height}px`;
+                }
+            }
+            scrollChatToBottom(true);
+            drawerInput.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }, 250);
+    });
+
+    drawerInput.addEventListener('blur', () => {
+        setTimeout(() => {
+            const aiDrawer = document.getElementById('ai-drawer');
+            if (aiDrawer && (!window.visualViewport || (window.innerHeight - window.visualViewport.height < 100))) {
+                aiDrawer.style.height = '';
+            }
+        }, 150);
+    });
+}
+
 
 // ==================== 8. HELP CENTER & SUPPORT TICKETS ====================
 const supportTicketForm = document.getElementById('support-ticket-form');
