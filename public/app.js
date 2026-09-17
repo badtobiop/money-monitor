@@ -666,12 +666,19 @@ const viewMeta = {
     'view-help': { title: 'Help Center & Support', subtitle: 'Submit tickets directly to our admin desk — real-time Gmail dispatch' }
 };
 
-navItems.forEach(item => {
+document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', () => {
         const targetView = item.getAttribute('data-view');
+        if (!targetView) return;
 
-        navItems.forEach(n => n.classList.remove('active'));
-        item.classList.add('active');
+        // Sync active state on both desktop sidebar and mobile bottom nav
+        document.querySelectorAll('.nav-item').forEach(n => {
+            if (n.getAttribute('data-view') === targetView) {
+                n.classList.add('active');
+            } else {
+                n.classList.remove('active');
+            }
+        });
 
         viewPanels.forEach(panel => {
             if (panel.id === targetView) {

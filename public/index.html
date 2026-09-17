@@ -106,6 +106,16 @@
 
     <!-- MAIN APPLICATION (Protected Workspace) -->
     <div class="dashboard-wrapper" id="dashboard-app" style="display: none;">
+        <!-- MOBILE TOP HEADER (Shown only on phone/mobile screens) -->
+        <header class="mobile-top-bar">
+            <div class="mobile-brand">
+                <div class="brand-icon">✨</div>
+                <span class="brand-name">Aura AI</span>
+            </div>
+            <div class="mobile-top-actions">
+                <button type="button" class="mobile-logout-btn" onclick="window.logout('login')" title="Sign Out">🚪 Logout</button>
+            </div>
+        </header>
         
         <!-- LEFT SIDEBAR -->
         <aside class="sidebar">
@@ -594,6 +604,26 @@
             </div>
 
         </div>
+
+        <!-- MOBILE BOTTOM NAVIGATION BAR (Fixed at bottom on phones) -->
+        <nav class="mobile-bottom-nav">
+            <button class="nav-item active" data-view="view-dashboard">
+                <div class="nav-icon-circle">📊</div>
+                <span class="nav-label">Dashboard</span>
+            </button>
+            <button class="nav-item" data-view="view-statistics">
+                <div class="nav-icon-circle">📈</div>
+                <span class="nav-label">Stats</span>
+            </button>
+            <button class="nav-item" data-view="view-settings">
+                <div class="nav-icon-circle">⚙️</div>
+                <span class="nav-label">Settings</span>
+            </button>
+            <button class="nav-item" data-view="view-help">
+                <div class="nav-icon-circle">💬</div>
+                <span class="nav-label">Support</span>
+            </button>
+        </nav>
     </div>
 
     <!-- FLOATING AI AGENT TRIGGER BUTTON (Bottom-Right Circle) -->
