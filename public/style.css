@@ -42,12 +42,103 @@
     --radius-xl: 30px;
 }
 
-* {
+/* ==================== UNIVERSAL SCROLLBAR HIDING ====================
+   Hides all scrollbars & scroll lines everywhere (Chrome, Edge, Safari, Firefox, Opera)
+   while preserving smooth scrolling via wheel, touch, and trackpad.
+   ========================================================================== */
+
+/* Hide scrollbar for standard browsers (Firefox) and legacy Edge/IE */
+html,
+body,
+*,
+*::before,
+*::after {
     box-sizing: border-box;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+* {
     margin: 0;
     padding: 0;
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
+}
+
+/* Hide scrollbar for WebKit browsers (Chrome, Edge, Safari, Opera, Brave) */
+::-webkit-scrollbar,
+*::-webkit-scrollbar,
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+}
+
+::-webkit-scrollbar-track,
+*::-webkit-scrollbar-track,
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+    display: none !important;
+    background: transparent !important;
+    border: none !important;
+}
+
+::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-thumb,
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+    display: none !important;
+    background: transparent !important;
+    border: none !important;
+}
+
+::-webkit-scrollbar-corner,
+*::-webkit-scrollbar-corner {
+    display: none !important;
+    background: transparent !important;
+}
+
+::-webkit-resizer,
+*::-webkit-resizer {
+    display: none !important;
+}
+
+/* Explicit reinforcement for all scrollable layout elements */
+.content-viewport,
+.table-container,
+.upcoming-bills-list,
+.drawer-messages,
+.drawer-chips,
+.ticket-list,
+.sidebar,
+.dashboard-wrapper,
+.auth-overlay,
+.auth-card,
+textarea,
+pre {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+.content-viewport::-webkit-scrollbar,
+.table-container::-webkit-scrollbar,
+.upcoming-bills-list::-webkit-scrollbar,
+.drawer-messages::-webkit-scrollbar,
+.drawer-chips::-webkit-scrollbar,
+.ticket-list::-webkit-scrollbar,
+.sidebar::-webkit-scrollbar,
+.dashboard-wrapper::-webkit-scrollbar,
+.auth-overlay::-webkit-scrollbar,
+.auth-card::-webkit-scrollbar,
+textarea::-webkit-scrollbar,
+pre::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
 }
 
 body {
