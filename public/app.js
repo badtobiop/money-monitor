@@ -469,6 +469,58 @@ authForm.addEventListener('submit', async (e) => {
 window.logout = function(targetMode = 'login') {
     localStorage.removeItem('aura_user');
     currentUser = null;
+
+    // === Google GIS Sign-Out Fix ===
+    // 1. disableAutoSelect: stops Google from auto-selecting the previously used account
+    // 2. revoke: clears the session hint so user can pick any account next time
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+        try {
+            window.google.accounts.id.disableAutoSelect();
+        } catch(e) {}
+    }
+
+    // Re-render the Google button from scratch to show full account picker popup
+    const googleWrapper = document.getElementById('google-signin-wrapper');
+    if (googleWrapper) {
+        const oldBtn = googleWrapper.querySelector('.g_id_signin');
+        if (oldBtn) {
+            oldBtn.remove();
+        }
+        // Recreate the button element fresh
+        const newBtn = document.createElement('div');
+        newBtn.className = 'g_id_signin';
+        newBtn.setAttribute('data-type', 'standard');
+        newBtn.setAttribute('data-shape', 'pill');
+        newBtn.setAttribute('data-theme', 'outline');
+        newBtn.setAttribute('data-text', 'signin_with');
+        newBtn.setAttribute('data-size', 'large');
+        newBtn.setAttribute('data-logo_alignment', 'left');
+        newBtn.setAttribute('data-width', '320');
+        googleWrapper.appendChild(newBtn);
+
+        // Re-initialize Google Sign-In with select_account prompt (forces account picker)
+        if (window.google && window.google.accounts && window.google.accounts.id) {
+            window.google.accounts.id.initialize({
+                client_id: '786991397900-g07b4v23aa9sb1f5j57184f0qrvgs84v.apps.googleusercontent.com',
+                callback: window.handleGoogleLogin,
+                ux_mode: 'popup',
+                prompt_parent_id: undefined,
+                auto_select: false,
+                context: 'signin'
+            });
+            window.google.accounts.id.renderButton(newBtn, {
+                type: 'standard',
+                shape: 'pill',
+                theme: 'outline',
+                text: 'signin_with',
+                size: 'large',
+                logo_alignment: 'left',
+                width: 320
+            });
+        }
+    }
+    // === End Google Fix ===
+
     dashboardApp.style.display = 'none';
     authModal.style.display = 'flex';
     authEmail.value = '';
