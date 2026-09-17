@@ -42,100 +42,59 @@
     --radius-xl: 30px;
 }
 
-/* ==================== UNIVERSAL SCROLLBAR HIDING ====================
-   Hides all scrollbars & scroll lines everywhere (Chrome, Edge, Safari, Firefox, Opera)
-   while preserving smooth scrolling via wheel, touch, and trackpad.
+/* ==================== SELECTIVE SCROLLBAR SYSTEM ====================
+   Hides scrollbar lines where unwanted (page viewport, tables, lists)
+   while keeping scrolling 100% active, AND preserves a visible horizontal
+   scrollbar for AI agent chips so users can easily see & slide to the right!
    ========================================================================== */
 
-/* Hide scrollbar for standard browsers (Firefox) and legacy Edge/IE */
-html,
-body,
-*,
-*::before,
-*::after {
-    box-sizing: border-box;
-    scrollbar-width: none !important;
-    -ms-overflow-style: none !important;
-}
-
 * {
+    box-sizing: border-box;
     margin: 0;
     padding: 0;
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
 }
 
-/* Hide scrollbar for WebKit browsers (Chrome, Edge, Safari, Opera, Brave) */
-::-webkit-scrollbar,
-*::-webkit-scrollbar,
+html, body {
+    scroll-behavior: smooth;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
 html::-webkit-scrollbar,
 body::-webkit-scrollbar {
     display: none !important;
     width: 0 !important;
     height: 0 !important;
-    background: transparent !important;
-    opacity: 0 !important;
-    visibility: hidden !important;
 }
 
-::-webkit-scrollbar-track,
-*::-webkit-scrollbar-track,
-html::-webkit-scrollbar-track,
-body::-webkit-scrollbar-track {
-    display: none !important;
-    background: transparent !important;
-    border: none !important;
-}
-
-::-webkit-scrollbar-thumb,
-*::-webkit-scrollbar-thumb,
-html::-webkit-scrollbar-thumb,
-body::-webkit-scrollbar-thumb {
-    display: none !important;
-    background: transparent !important;
-    border: none !important;
-}
-
-::-webkit-scrollbar-corner,
-*::-webkit-scrollbar-corner {
-    display: none !important;
-    background: transparent !important;
-}
-
-::-webkit-resizer,
-*::-webkit-resizer {
-    display: none !important;
-}
-
-/* Explicit reinforcement for all scrollable layout elements */
+/* Elements where scrollbar line is hidden but native scrolling is 100% active */
 .content-viewport,
 .table-container,
 .upcoming-bills-list,
 .drawer-messages,
-.drawer-chips,
 .ticket-list,
 .sidebar,
 .dashboard-wrapper,
 .auth-overlay,
 .auth-card,
-textarea,
-pre {
+textarea {
     scrollbar-width: none !important;
     -ms-overflow-style: none !important;
+    -webkit-overflow-scrolling: touch;
 }
 
 .content-viewport::-webkit-scrollbar,
 .table-container::-webkit-scrollbar,
 .upcoming-bills-list::-webkit-scrollbar,
 .drawer-messages::-webkit-scrollbar,
-.drawer-chips::-webkit-scrollbar,
 .ticket-list::-webkit-scrollbar,
 .sidebar::-webkit-scrollbar,
 .dashboard-wrapper::-webkit-scrollbar,
 .auth-overlay::-webkit-scrollbar,
 .auth-card::-webkit-scrollbar,
-textarea::-webkit-scrollbar,
-pre::-webkit-scrollbar {
+textarea::-webkit-scrollbar {
     display: none !important;
     width: 0 !important;
     height: 0 !important;
@@ -953,9 +912,12 @@ body {
 
 .content-viewport {
     flex: 1;
-    overflow-y: auto;
+    overflow-y: auto !important;
+    overflow-x: hidden;
     padding: 32px 40px;
     background: transparent;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
 }
 
 .content-header {
@@ -1901,13 +1863,46 @@ body {
     font-size: 0.84rem;
 }
 
+/* AI Agent quick chips - visible horizontal scrollbar so users can easily see & scroll right */
 .drawer-chips {
     display: flex;
     gap: 8px;
-    padding: 8px 16px;
-    overflow-x: auto;
+    padding: 10px 16px 10px 16px;
+    overflow-x: auto !important;
+    overflow-y: hidden;
     background: var(--bg-surface);
     border-top: 1px solid var(--border-subtle);
+    scrollbar-width: thin !important;
+    scrollbar-color: #e11d48 rgba(254, 205, 211, 0.45) !important;
+    -ms-overflow-style: auto !important;
+    -webkit-overflow-scrolling: touch;
+}
+
+.drawer-chips::-webkit-scrollbar {
+    display: block !important;
+    height: 5px !important;
+    width: auto !important;
+    background: rgba(254, 205, 211, 0.35) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    border-radius: 6px !important;
+}
+
+.drawer-chips::-webkit-scrollbar-track {
+    display: block !important;
+    background: rgba(254, 205, 211, 0.3) !important;
+    border-radius: 6px !important;
+}
+
+.drawer-chips::-webkit-scrollbar-thumb {
+    display: block !important;
+    background: linear-gradient(90deg, #f43f5e, #e11d48) !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+}
+
+.drawer-chips::-webkit-scrollbar-thumb:hover {
+    background: #be123c !important;
 }
 
 .chip-item {

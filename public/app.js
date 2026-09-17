@@ -13,26 +13,23 @@ const API_BASE = (window.location.hostname === 'localhost' || window.location.ho
     ? 'http://localhost:3000'
     : '';
 
-// ==================== 1. LENIS SMOOTH SCROLL INITIALIZATION ====================
-let lenis;
-try {
-    if (typeof Lenis !== 'undefined') {
-        lenis = new Lenis({
-            duration: 2,
-            easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-            wrapper: document.getElementById('scroll-container') || window,
-            content: document.getElementById('scroll-container') || document.body,
-        });
-
-        function raf(time) {
-            lenis.raf(time);
-            requestAnimationFrame(raf);
+// ==================== 1. NATIVE SMOOTH SCROLL & CHIPS HORIZONTAL SCROLL ====================
+// Native smooth scroll enabled without any third-party hijacking
+document.addEventListener('DOMContentLoaded', () => {
+    // Enable horizontal wheel scroll for AI agent prompt chips
+    const setupChipsScroll = () => {
+        const drawerChips = document.querySelector('.drawer-chips');
+        if (drawerChips) {
+            drawerChips.addEventListener('wheel', (e) => {
+                if (e.deltaY !== 0) {
+                    e.preventDefault();
+                    drawerChips.scrollLeft += e.deltaY;
+                }
+            }, { passive: false });
         }
-        requestAnimationFrame(raf);
-    }
-} catch (e) {
-    console.warn('Lenis could not be initialized:', e);
-}
+    };
+    setupChipsScroll();
+});
 
 // ==================== 2. AUTHENTICATION (LOGIN / SIGNUP / RESET / SESSION) ====================
 const authModal = document.getElementById('auth-modal');
