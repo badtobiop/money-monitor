@@ -676,6 +676,8 @@ async function checkAuth() {
     }
 
     // Show Auth Modal
+    document.body.classList.remove('logged-in');
+    document.body.classList.add('logged-out');
     authModal.style.display = 'flex';
     dashboardApp.style.display = 'none';
     const postLogoutMode = sessionStorage.getItem('aura_auth_mode');
@@ -688,6 +690,8 @@ async function checkAuth() {
 }
 
 function initAppForUser() {
+    document.body.classList.add('logged-in');
+    document.body.classList.remove('logged-out');
     authModal.style.setProperty('display', 'none', 'important');
     dashboardApp.style.setProperty('display', 'flex', 'important');
 
@@ -1231,6 +1235,12 @@ function openDrawer() {
 
 function closeDrawer() {
     aiDrawer.classList.remove('open');
+    aiDrawer.classList.remove('keyboard-open');
+    aiDrawer.style.removeProperty('--keyboard-drawer-height');
+    aiDrawer.style.removeProperty('height');
+    aiDrawer.style.removeProperty('max-height');
+    aiDrawer.style.removeProperty('top');
+    if (drawerInput) drawerInput.blur();
     if (typeof gsap !== 'undefined') {
         gsap.to(aiFabBtn, { scale: 1, opacity: 1, duration: 0.2 });
     }
@@ -1339,23 +1349,32 @@ if (window.MutationObserver && drawerChatBox) {
     chatObserver.observe(drawerChatBox, { childList: true, subtree: true, characterData: true });
 }
 
-// 2. Mobile Visual Viewport: Pushes the AI chat input row UP above the on-screen keyboard
+// 2. Mobile Visual Viewport: Pin AI chat drawer right on top of virtual keyboard with ZERO white space
 if (window.visualViewport) {
     const syncDrawerWithKeyboard = () => {
         const aiDrawer = document.getElementById('ai-drawer');
         if (!aiDrawer || !aiDrawer.classList.contains('open')) return;
 
-        // When keyboard opens, visualViewport.height shrinks
-        const vpHeight = window.visualViewport.height;
+        const vp = window.visualViewport;
+        const vpHeight = vp.height;
         const screenHeight = window.innerHeight;
 
-        if (screenHeight - vpHeight > 100) {
-            // Keyboard is OPEN: pin drawer to visual viewport height
-            aiDrawer.style.height = `${vpHeight}px`;
+        if (screenHeight - vpHeight > 80) {
+            // Virtual Keyboard is OPEN
+            aiDrawer.classList.add('keyboard-open');
+            aiDrawer.style.setProperty('--keyboard-drawer-height', `${vpHeight}px`);
+            aiDrawer.style.setProperty('height', `${vpHeight}px`, 'important');
+            aiDrawer.style.setProperty('max-height', `${vpHeight}px`, 'important');
+            aiDrawer.style.setProperty('top', `${vp.offsetTop}px`, 'important');
+            window.scrollTo(0, 0);
             scrollChatToBottom(false);
         } else {
-            // Keyboard is CLOSED
-            aiDrawer.style.height = '';
+            // Virtual Keyboard is CLOSED
+            aiDrawer.classList.remove('keyboard-open');
+            aiDrawer.style.removeProperty('--keyboard-drawer-height');
+            aiDrawer.style.removeProperty('height');
+            aiDrawer.style.removeProperty('max-height');
+            aiDrawer.style.removeProperty('top');
         }
     };
 
@@ -1363,28 +1382,41 @@ if (window.visualViewport) {
     window.visualViewport.addEventListener('scroll', syncDrawerWithKeyboard);
 }
 
-// Focus handler for mobile input
+// Focus and blur handlers for mobile drawer input (Zero white space gap)
 if (drawerInput) {
     drawerInput.addEventListener('focus', () => {
+        window.scrollTo(0, 0);
         setTimeout(() => {
-            if (window.visualViewport) {
-                const aiDrawer = document.getElementById('ai-drawer');
-                if (aiDrawer) {
-                    aiDrawer.style.height = `${window.visualViewport.height}px`;
+            const aiDrawer = document.getElementById('ai-drawer');
+            if (aiDrawer) {
+                aiDrawer.classList.add('keyboard-open');
+                if (window.visualViewport) {
+                    const vp = window.visualViewport;
+                    const vpHeight = vp.height;
+                    aiDrawer.style.setProperty('--keyboard-drawer-height', `${vpHeight}px`);
+                    aiDrawer.style.setProperty('height', `${vpHeight}px`, 'important');
+                    aiDrawer.style.setProperty('max-height', `${vpHeight}px`, 'important');
+                    aiDrawer.style.setProperty('top', `${vp.offsetTop}px`, 'important');
                 }
             }
+            window.scrollTo(0, 0);
             scrollChatToBottom(true);
-            drawerInput.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-        }, 250);
+        }, 120);
     });
 
     drawerInput.addEventListener('blur', () => {
         setTimeout(() => {
             const aiDrawer = document.getElementById('ai-drawer');
-            if (aiDrawer && (!window.visualViewport || (window.innerHeight - window.visualViewport.height < 100))) {
-                aiDrawer.style.height = '';
+            if (aiDrawer) {
+                if (!window.visualViewport || (window.innerHeight - window.visualViewport.height < 80)) {
+                    aiDrawer.classList.remove('keyboard-open');
+                    aiDrawer.style.removeProperty('--keyboard-drawer-height');
+                    aiDrawer.style.removeProperty('height');
+                    aiDrawer.style.removeProperty('max-height');
+                    aiDrawer.style.removeProperty('top');
+                }
             }
-        }, 150);
+        }, 120);
     });
 }
 
