@@ -2248,22 +2248,447 @@ body {
     margin-top: 4px;
 }
 
-/* ==================== RESPONSIVE RULES ==================== */
-
-@media (max-width: 1100px) {
-    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-    .dashboard-split { grid-template-columns: 1fr; }
-    .circles-grid { grid-template-columns: 1fr; }
-    .help-layout-grid { grid-template-columns: 1fr; }
-    .help-hero-card { flex-direction: column; align-items: flex-start; }
+/* Desktop default: mobile top actions hidden */
+.mobile-top-bar-actions {
+    display: none;
 }
 
+/* ==========================================================================
+   COMPREHENSIVE RESPONSIVE DESIGN SYSTEM (ALL DEVICES: TABLETS, PHONES, DESKTOPS)
+   MOBILE BOTTOM NAVIGATION BAR + FLUID AUTO-ADAPTIVE GRIDS
+   ========================================================================== */
+
+/* 1. TABLET BREAKPOINT (max-width: 1024px) */
+@media (max-width: 1024px) {
+    .content-viewport {
+        padding: 24px 28px;
+    }
+
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+
+    .dashboard-split {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .circles-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 18px;
+    }
+
+    .help-layout-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .help-hero-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+}
+
+/* 2. MOBILE & TABLET PORTRAIT BREAKPOINT (max-width: 768px) */
 @media (max-width: 768px) {
-    .kpi-grid { grid-template-columns: 1fr; }
-    .dashboard-wrapper { flex-direction: column; height: auto; }
-    .sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
-    .ai-drawer { width: 100%; }
-    .quick-form { grid-template-columns: 1fr; }
-    .form-row-2col { grid-template-columns: 1fr; }
-    .support-btn-row { flex-direction: column; align-items: stretch; }
+    /* App Container Layout */
+    .dashboard-wrapper {
+        display: flex !important;
+        flex-direction: column !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        overflow: hidden !important;
+        position: relative !important;
+    }
+
+    /* TOP BAR (From Sidebar Header) */
+    .sidebar {
+        width: 100% !important;
+        height: auto !important;
+        flex-shrink: 0 !important;
+        background: rgba(22, 5, 9, 0.96) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border-right: none !important;
+        border-bottom: 1px solid rgba(244, 63, 94, 0.22) !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35) !important;
+        position: relative !important;
+        z-index: 100 !important;
+    }
+
+    .sidebar-brand {
+        padding: 10px 16px !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        border-bottom: none !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .mobile-top-bar-actions {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+    }
+
+    .mobile-logout-btn {
+        background: rgba(225, 29, 72, 0.2) !important;
+        border: 1px solid rgba(225, 29, 72, 0.45) !important;
+        color: #fda4af !important;
+        padding: 6px 12px !important;
+        border-radius: 8px !important;
+        font-size: 0.76rem !important;
+        font-weight: 700 !important;
+        cursor: pointer !important;
+        transition: all 0.2s !important;
+    }
+
+    .mobile-logout-btn:active {
+        background: rgba(225, 29, 72, 0.4) !important;
+    }
+
+    /* Hide desktop-only elements from mobile top bar */
+    .salary-sidebar-widget {
+        display: none !important;
+    }
+
+    .sidebar-footer {
+        display: none !important;
+    }
+
+    /* ==================== MOBILE BOTTOM NAVIGATION BAR ==================== */
+    .sidebar-nav {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        background: rgba(18, 4, 7, 0.96) !important;
+        backdrop-filter: blur(24px) !important;
+        -webkit-backdrop-filter: blur(24px) !important;
+        border-top: 1px solid rgba(244, 63, 94, 0.28) !important;
+        box-shadow: 0 -6px 28px rgba(0, 0, 0, 0.5) !important;
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: space-around !important;
+        align-items: center !important;
+        padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px)) 6px !important;
+        margin: 0 !important;
+        z-index: 998 !important;
+        box-sizing: border-box !important;
+    }
+
+    .nav-item {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 3px !important;
+        padding: 6px 4px !important;
+        border-radius: 12px !important;
+        flex: 1 !important;
+        max-width: 85px !important;
+        width: auto !important;
+        background: transparent !important;
+        border: 1px solid transparent !important;
+        color: rgba(255, 255, 255, 0.65) !important;
+        text-align: center !important;
+        cursor: pointer !important;
+        -webkit-tap-highlight-color: transparent !important;
+        transition: all 0.2s cubic-bezier(0.2, 1, 0.3, 1) !important;
+    }
+
+    .nav-item:active {
+        transform: scale(0.92) !important;
+    }
+
+    .nav-item.active {
+        color: #ffffff !important;
+        background: rgba(225, 29, 72, 0.2) !important;
+        border-color: rgba(225, 29, 72, 0.35) !important;
+    }
+
+    .nav-icon-circle {
+        width: 32px !important;
+        height: 32px !important;
+        font-size: 1rem !important;
+        border-radius: 50% !important;
+        background: rgba(255, 255, 255, 0.08) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: all 0.2s ease !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+    }
+
+    .nav-item.active .nav-icon-circle {
+        background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%) !important;
+        box-shadow: 0 0 14px rgba(225, 29, 72, 0.65) !important;
+        transform: scale(1.08) !important;
+    }
+
+    .nav-label {
+        font-size: 0.68rem !important;
+        font-weight: 600 !important;
+        letter-spacing: 0.2px !important;
+        white-space: nowrap !important;
+    }
+
+    /* Main Scrollable Viewport on Mobile */
+    .content-viewport {
+        flex: 1 !important;
+        overflow-y: auto !important;
+        padding: 16px 14px calc(85px + env(safe-area-inset-bottom, 0px)) 14px !important;
+        box-sizing: border-box !important;
+    }
+
+    .content-header {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 12px !important;
+        margin-bottom: 18px !important;
+    }
+
+    .page-title {
+        font-size: 1.45rem !important;
+        letter-spacing: -0.3px !important;
+    }
+
+    .page-subtitle {
+        font-size: 0.82rem !important;
+    }
+
+    .header-actions {
+        width: 100% !important;
+        justify-content: flex-start !important;
+    }
+
+    /* KPI Metrics Grid */
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px !important;
+        margin-bottom: 20px !important;
+    }
+
+    .kpi-card {
+        padding: 14px 12px !important;
+        border-radius: 14px !important;
+    }
+
+    .kpi-val {
+        font-size: 1.25rem !important;
+    }
+
+    .kpi-label {
+        font-size: 0.72rem !important;
+    }
+
+    .kpi-note {
+        font-size: 0.68rem !important;
+    }
+
+    /* Quick Expense Form */
+    .quick-form {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 10px !important;
+    }
+
+    .quick-form input[type="text"],
+    .quick-form input[type="number"],
+    .quick-form select,
+    .quick-form button,
+    .quick-form .btn-primary {
+        width: 100% !important;
+        flex: none !important;
+        min-height: 44px !important;
+        font-size: 0.9rem !important;
+        border-radius: 10px !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Dashboard Split Layout */
+    .dashboard-split {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+    }
+
+    .glass-card {
+        padding: 16px 14px !important;
+        border-radius: 16px !important;
+    }
+
+    .card-heading h3 {
+        font-size: 0.95rem !important;
+    }
+
+    /* Tables */
+    .table-container {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        margin: 0 -2px !important;
+    }
+
+    .data-table {
+        min-width: 480px !important;
+        font-size: 0.82rem !important;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 8px 10px !important;
+    }
+
+    /* Statistics View */
+    .stats-intro h2 {
+        font-size: 1.3rem !important;
+    }
+
+    .circles-grid {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+    }
+
+    .circle-card {
+        padding: 20px 14px !important;
+    }
+
+    /* Help Center View */
+    .help-hero-card {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 14px !important;
+        padding: 18px 14px !important;
+    }
+
+    .help-hero-content h2 {
+        font-size: 1.3rem !important;
+    }
+
+    .help-hero-meta {
+        width: 100% !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+    }
+
+    .help-layout-grid {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+    }
+
+    .form-row-2col {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
+
+    .support-btn-row {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 10px !important;
+    }
+
+    /* Floating AI Button & Drawer */
+    .ai-fab {
+        bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
+        right: 14px !important;
+        width: 52px !important;
+        height: 52px !important;
+        box-shadow: 0 8px 24px rgba(225, 29, 72, 0.45) !important;
+    }
+
+    .ai-fab-icon {
+        font-size: 1.35rem !important;
+    }
+
+    .ai-drawer {
+        width: 100% !important;
+        max-width: 100% !important;
+        z-index: 1050 !important;
+    }
+
+    .drawer-header {
+        padding: 14px 16px !important;
+    }
+
+    .drawer-messages {
+        padding: 14px 12px !important;
+    }
+
+    .drawer-chips {
+        padding: 8px 12px !important;
+    }
+
+    .drawer-input-row {
+        padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)) 12px !important;
+    }
+
+    /* Auth Modal */
+    .auth-overlay {
+        padding: 12px !important;
+    }
+
+    .auth-card {
+        padding: 28px 20px !important;
+        border-radius: 18px !important;
+        max-width: 100% !important;
+    }
+
+    .auth-title {
+        font-size: 1.45rem !important;
+    }
+
+    .auth-subtitle {
+        font-size: 0.8rem !important;
+    }
+}
+
+/* 3. SMALL MOBILE SCREEN BREAKPOINT (max-width: 480px) */
+@media (max-width: 480px) {
+    .kpi-grid {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
+
+    .sidebar-brand {
+        padding: 8px 12px !important;
+    }
+
+    .brand-name {
+        font-size: 1.05rem !important;
+    }
+
+    .brand-badge {
+        font-size: 0.58rem !important;
+        padding: 1px 6px !important;
+    }
+
+    .nav-label {
+        font-size: 0.62rem !important;
+    }
+
+    .nav-icon-circle {
+        width: 28px !important;
+        height: 28px !important;
+        font-size: 0.9rem !important;
+    }
+
+    .auth-tabs {
+        gap: 2px !important;
+        padding: 3px !important;
+    }
+
+    .auth-tab-btn {
+        font-size: 0.72rem !important;
+        padding: 7px 4px !important;
+    }
+
+    .auth-card {
+        padding: 22px 16px !important;
+    }
 }
