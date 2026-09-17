@@ -760,7 +760,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
             res.json({ reply: '⏳ Google AI Free Tier rate limit reached. Please wait 30 seconds before sending another message.' });
             return;
         }
-        res.status(500).json({ error: 'Failed to communicate with AI Agent' });
+        res.status(500).json({ error: 'Failed to communicate with AI Agent', detail: String(error?.message || error).slice(0, 200) });
     }
 });
 
