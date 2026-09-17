@@ -764,6 +764,21 @@ app.post('/api/chat', async (req: Request, res: Response) => {
     }
 });
 
+// TEMP DEBUG: Check environment variables on Vercel (remove after debugging)
+app.get('/api/debug-env', (req: Request, res: Response) => {
+    const geminiKey = process.env.GEMINI_API_KEY || '';
+    const tursoUrl = process.env.TURSO_DATABASE_URL || '';
+    const tursoToken = process.env.TURSO_AUTH_TOKEN || '';
+    res.json({
+        GEMINI_API_KEY: geminiKey ? geminiKey.slice(0, 5) + '...' + geminiKey.slice(-4) : 'NOT SET ❌',
+        TURSO_DATABASE_URL: tursoUrl ? tursoUrl.slice(0, 20) + '...' : 'NOT SET ❌',
+        TURSO_AUTH_TOKEN: tursoToken ? 'SET ✅ (length: ' + tursoToken.length + ')' : 'NOT SET ❌',
+        EMAIL_USER: process.env.EMAIL_USER || 'NOT SET ❌',
+        NODE_ENV: process.env.NODE_ENV || 'not set',
+        VERCEL: process.env.VERCEL || 'not set'
+    });
+});
+
 export default app;
 
 if (!process.env.VERCEL) {
