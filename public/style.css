@@ -215,6 +215,25 @@ body {
     to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
+
+.auth-banner-container {
+    width: 100%;
+    margin-bottom: 16px;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(244, 63, 94, 0.22), 0 2px 8px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(244, 63, 94, 0.35);
+    background: #0d0407;
+}
+
+.auth-banner-img {
+    width: 100%;
+    height: auto;
+    max-height: 130px;
+    object-fit: cover;
+    display: block;
+}
+
 .auth-logo {
     display: inline-block;
     background: var(--primary-light);
