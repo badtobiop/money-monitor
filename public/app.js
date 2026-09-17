@@ -9,9 +9,21 @@ let currentCurrency = '₹';
 let currentUser = null;
 
 // Base API URL: Automatically routes to port 3000 even if opened via VS Code Live Server (5500) or file://
+// Base API URL: Automatically routes to port 3000 even if opened via VS Code Live Server (5500) or file://
 const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port !== '3000' && window.location.port !== ''
     ? 'http://localhost:3000'
     : '';
+
+// Clear poisoned Google GIS state cookie so account clicks never get suppressed
+function clearGoogleGsiState() {
+    try {
+        const hostname = window.location.hostname;
+        document.cookie = "g_state=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        document.cookie = "g_state=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=" + hostname;
+        document.cookie = "g_state=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=." + hostname;
+    } catch(e) {}
+}
+clearGoogleGsiState();
 
 // ==================== 1. NATIVE SMOOTH SCROLL & CHIPS HORIZONTAL SCROLL ====================
 // Native smooth scroll enabled without any third-party hijacking
@@ -245,23 +257,32 @@ if (window._pendingGoogleResponse) {
     delete window._pendingGoogleResponse;
 }
 
-// Bottom Toggle Function
-window.toggleAuthMode = function() {
-    if (currentAuthMode === 'login') {
-        setAuthMode('signup');
-    } else {
+// Bottom Toggle Function (Deterministic switch)
+window.toggleAuthMode = function(explicitMode) {
+    if (explicitMode) {
+        setAuthMode(explicitMode);
+        return;
+    }
+    if (currentAuthMode === 'signup' || currentAuthMode === 'forgot' || currentAuthMode === 'set-new-password') {
         setAuthMode('login');
+    } else {
+        setAuthMode('signup');
     }
 };
 
-// Tab Click Events
-tabLoginBtn?.addEventListener('click', () => setAuthMode('login'));
-tabSignupBtn?.addEventListener('click', () => setAuthMode('signup'));
-tabResetBtn?.addEventListener('click', () => setAuthMode('forgot'));
-forgotPasswordLink?.addEventListener('click', () => setAuthMode('forgot'));
+// Tab Click Events (Clear previous and assign cleanly)
+if (tabLoginBtn) tabLoginBtn.onclick = (e) => { e.preventDefault(); setAuthMode('login'); };
+if (tabSignupBtn) tabSignupBtn.onclick = (e) => { e.preventDefault(); setAuthMode('signup'); };
+if (tabResetBtn) tabResetBtn.onclick = (e) => { e.preventDefault(); setAuthMode('forgot'); };
+if (forgotPasswordLink) forgotPasswordLink.onclick = (e) => { e.preventDefault(); setAuthMode('forgot'); };
 
-// Bottom Toggle Button
-authToggleBtn?.addEventListener('click', () => window.toggleAuthMode());
+// Bottom Toggle Button (Explicit toggle with single handler)
+if (authToggleBtn) {
+    authToggleBtn.onclick = (e) => {
+        e.preventDefault();
+        window.toggleAuthMode();
+    };
+}
 
 // Hash Change Listener
 window.addEventListener('hashchange', () => {
@@ -471,6 +492,7 @@ authForm.addEventListener('submit', async (e) => {
 
 // Logout Handler (can optionally open directly to 'signup' or 'login')
 window.logout = function(targetMode = 'login') {
+    clearGoogleGsiState();
     // 1. Clear local user session
     localStorage.removeItem('aura_user');
     currentUser = null;
