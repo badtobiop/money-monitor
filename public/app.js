@@ -491,6 +491,74 @@ authForm.addEventListener('submit', async (e) => {
 });
 
 // Logout Handler (can optionally open directly to 'signup' or 'login')
+
+// ==================== GOOGLE OAUTH2 TOKEN CLIENT (CUSTOM BUTTON) ====================
+let googleTokenClient = null;
+
+window.initGoogleAuth = function() {
+    if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+        try {
+            googleTokenClient = window.google.accounts.oauth2.initTokenClient({
+                client_id: '786991397900-g07b4v23aa9sb1f5j57184f0qrvgs84v.apps.googleusercontent.com',
+                scope: 'email profile openid',
+                prompt: 'select_account',
+                callback: async (tokenResponse) => {
+                    if (tokenResponse.error) {
+                        console.error('Google OAuth2 error:', tokenResponse.error);
+                        if (authError) {
+                            authError.innerText = 'Google Sign-In was cancelled or failed. Please try again.';
+                            authError.style.display = 'block';
+                        }
+                        if (authSuccess) authSuccess.style.display = 'none';
+                        return;
+                    }
+                    if (tokenResponse.access_token) {
+                        await window.handleGoogleLogin({ credential: tokenResponse.access_token });
+                    }
+                }
+            });
+            console.log('Google OAuth2 TokenClient initialized successfully!');
+        } catch (e) {
+            console.error('Failed to init Google OAuth2 TokenClient:', e);
+        }
+    }
+};
+
+// Also attempt initialization on startup in case library is already present
+if (window.google) {
+    window.initGoogleAuth();
+}
+
+// Attach click listener to custom-google-btn
+document.addEventListener('DOMContentLoaded', () => {
+    const customGoogleBtn = document.getElementById('custom-google-btn');
+    if (customGoogleBtn) {
+        customGoogleBtn.addEventListener('click', () => {
+            if (authError) authError.style.display = 'none';
+            if (authSuccess) {
+                authSuccess.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 14px;background:rgba(244,63,94,0.12);border:1px solid rgba(244,63,94,0.3);border-radius:12px;color:#fda4af;font-weight:600;font-size:0.86rem;"><span style="display:inline-block;width:16px;height:16px;border:2px solid rgba(253,164,175,0.3);border-top-color:#fda4af;border-radius:50%;animation:spin 0.8s linear infinite;"></span> Opening Google Account Chooser...</div>';
+                authSuccess.style.display = 'block';
+            }
+
+            if (googleTokenClient) {
+                googleTokenClient.requestAccessToken({ prompt: 'select_account' });
+            } else if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+                window.initGoogleAuth();
+                googleTokenClient?.requestAccessToken({ prompt: 'select_account' });
+            } else if (window.google && window.google.accounts && window.google.accounts.id) {
+                window.google.accounts.id.prompt();
+            } else {
+                if (authError) {
+                    authError.innerText = 'Google authentication is initializing. Please tap again in 1 second.';
+                    authError.style.display = 'block';
+                }
+                if (authSuccess) authSuccess.style.display = 'none';
+            }
+        });
+    }
+});
+
+
 window.logout = function(targetMode = 'login') {
     clearGoogleGsiState();
     // 1. Clear local user session

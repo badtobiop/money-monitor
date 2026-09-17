@@ -161,27 +161,30 @@ app.post('/api/auth/google-login', async (req: Request, res: Response) => {
             return;
         }
 
-        // Verify token with Google's official tokeninfo endpoint
+        let email = '';
+        let name = '';
+
+        // 1. Try id_token first via Google tokeninfo
         const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(token)}`);
-        if (!googleRes.ok) {
-            const errData = await googleRes.json().catch(() => ({}));
-            console.error('Google token verification failed:', errData);
-            res.status(401).json({ error: 'Invalid Google authentication token.' });
-            return;
+        if (googleRes.ok) {
+            const payload: any = await googleRes.json();
+            email = String(payload.email || '').toLowerCase().trim();
+            name = String(payload.name || payload.given_name || email.split('@')[0] || 'User').trim();
+        } else {
+            // 2. Try access_token via Google UserInfo API (standard for OAuth2 TokenClient)
+            const userinfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (userinfoRes.ok) {
+                const userinfo: any = await userinfoRes.json();
+                email = String(userinfo.email || '').toLowerCase().trim();
+                name = String(userinfo.name || userinfo.given_name || email.split('@')[0] || 'User').trim();
+            } else {
+                console.error('Google token verification failed for both id_token and access_token');
+                res.status(401).json({ error: 'Invalid Google authentication token.' });
+                return;
+            }
         }
-
-        const payload: any = await googleRes.json();
-        const expectedClientId = (process.env.GOOGLE_CLIENT_ID || '786991397900-g07b4v23aa9sb1f5j57184f0qrvgs84v.apps.googleusercontent.com').trim();
-
-        // Security check: verify audience matches our Client ID
-        if (payload.aud !== expectedClientId && !payload.email) {
-            console.warn(`Token audience mismatch. Expected: ${expectedClientId}, got: ${payload.aud}`);
-            res.status(401).json({ error: 'Google authentication audience mismatch.' });
-            return;
-        }
-
-        const email = String(payload.email || '').toLowerCase().trim();
-        const name = String(payload.name || payload.given_name || email.split('@')[0] || 'User').trim();
 
         if (!email) {
             res.status(400).json({ error: 'Unable to retrieve email from Google account.' });
