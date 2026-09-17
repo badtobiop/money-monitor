@@ -38,7 +38,7 @@ const userSessions = new Map<string, any>();
 function getOrCreateUserSession(userId: string) {
     if (!userSessions.has(userId)) {
         const chat = ai.chats.create({
-            model: 'gemini-flash-lite-latest',
+            model: 'gemini-3.5-flash-lite',
             config: {
                 systemInstruction: `You are a sophisticated, helpful Autonomous Expense & Task AI Agent for user "${userId}". You converse in professional, friendly ENGLISH by default. You proactively use tools to record expenses, provide analytical summaries, and manage to-do tasks. Only switch to Hindi if the user explicitly asks you to speak in Hindi.`,
                 tools: toolsDeclaration

@@ -438,6 +438,50 @@ body {
     margin-left: 4px;
 }
 
+/* ==================== GOOGLE SIGN-IN BUTTON STYLING ==================== */
+
+#google-signin-wrapper {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin: 12px 0 16px 0;
+}
+
+#google-signin-wrapper .g_id_signin {
+    border-radius: 50px !important;
+    overflow: hidden;
+    border: 1.5px solid rgba(234, 67, 53, 0.35);
+    box-shadow: 0 0 0 0 rgba(234, 67, 53, 0);
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+                box-shadow 0.25s ease,
+                border-color 0.25s ease;
+    cursor: pointer;
+}
+
+#google-signin-wrapper:hover .g_id_signin {
+    transform: translateY(-3px) scale(1.025);
+    border-color: rgba(234, 67, 53, 0.75);
+    box-shadow: 0 8px 24px rgba(234, 67, 53, 0.25),
+                0 0 0 3px rgba(234, 67, 53, 0.08);
+}
+
+#google-signin-wrapper:active .g_id_signin {
+    transform: translateY(-1px) scale(1.01);
+    box-shadow: 0 4px 12px rgba(234, 67, 53, 0.18);
+}
+
+/* Pulse animation on page load to draw attention */
+@keyframes google-btn-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(234, 67, 53, 0.35); }
+    60%  { box-shadow: 0 0 0 8px rgba(234, 67, 53, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(234, 67, 53, 0); }
+}
+
+#google-signin-wrapper .g_id_signin {
+    animation: google-btn-pulse 2.5s ease-out 1s 2;
+}
+
 /* ==================== WORKSPACE LAYOUT (SIDEBAR + MAIN) ==================== */
 
 .dashboard-wrapper {
