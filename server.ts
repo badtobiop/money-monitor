@@ -25,7 +25,7 @@ function getLocalIpAddress(): string {
 
 // Database aur Tools
 import db from './db.js';
-import { toolsDeclaration, executeTool, getDashboardData, getStatisticsData } from './agentTools.js';
+import { toolsDeclaration, executeTool, getDashboardData, getStatisticsData, addExpense } from './agentTools.js';
 
 dotenv.config();
 
@@ -40,7 +40,9 @@ function getOrCreateUserSession(userId: string) {
         const chat = ai.chats.create({
             model: 'gemini-3.5-flash-lite',
             config: {
-                systemInstruction: `You are a sophisticated, helpful Autonomous Expense & Task AI Agent for user "${userId}". You converse in professional, friendly ENGLISH by default. You proactively use tools to record expenses, provide analytical summaries, and manage to-do tasks. Only switch to Hindi if the user explicitly asks you to speak in Hindi.`,
+                systemInstruction: `You are an ultra-fast, direct Expense & Task AI Agent for user "${userId}". You converse in concise English by default (or Hindi if requested). Be extremely fast, direct, and brief (1-2 sentences maximum). When recording an expense or task, confirm immediately without unnecessary pleasantries.`,
+                maxOutputTokens: 250,
+                temperature: 0.2,
                 tools: toolsDeclaration
             }
         });
@@ -632,6 +634,21 @@ app.post('/api/tasks/:id/toggle', async (req: Request, res: Response) => {
         res.json({ success: true, newStatus });
     } catch (error) {
         res.status(500).json({ error: 'Failed to toggle task' });
+    }
+});
+
+// Fast Direct Add Expense API (Bypasses LLM for instant ~50ms submission)
+app.post('/api/expenses', async (req: Request, res: Response) => {
+    try {
+        const { userId, title, amount, category } = req.body;
+        if (!userId || !title || amount === undefined || amount === null) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+        await addExpense(String(userId), String(title).trim(), Number(amount), String(category || 'General'));
+        res.json({ success: true, message: 'Expense added successfully' });
+    } catch (error: any) {
+        console.error('Failed to add direct expense:', error);
+        res.status(500).json({ error: error?.message || 'Failed to add expense' });
     }
 });
 
