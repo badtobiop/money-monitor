@@ -9,9 +9,9 @@ let currentCurrency = '₹';
 let currentUser = null;
 
 // Base API URL: Automatically routes to port 3000 even if opened via VS Code Live Server (5500) or file://
-const API_BASE = (window.location.protocol === 'http:' || window.location.protocol === 'https:') && window.location.port === '3000' 
-    ? '' 
-    : 'http://localhost:3000';
+const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port !== '3000' && window.location.port !== ''
+    ? 'http://localhost:3000'
+    : '';
 
 // ==================== 1. LENIS SMOOTH SCROLL INITIALIZATION ====================
 let lenis;
@@ -460,7 +460,7 @@ authForm.addEventListener('submit', async (e) => {
         console.error('Fetch error:', err);
         authSubmitBtn.disabled = false;
         authSubmitBtn.innerText = origBtnText;
-        authError.innerText = 'Connection error: Please ensure you access the app at http://localhost:3000';
+        authError.innerText = 'Connection error: Please check your internet connection and try again.';
         authError.style.display = 'block';
     }
 });

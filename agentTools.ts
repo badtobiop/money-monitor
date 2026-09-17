@@ -20,40 +20,40 @@ export interface Task {
 }
 
 // 1. Add Expense
-export function addExpense(userId: string, title: string, amount: number, category: string = 'General'): string {
+export async function addExpense(userId: string, title: string, amount: number, category: string = 'General'): Promise<string> {
     const date = new Date().toISOString().split('T')[0]!; // YYYY-MM-DD
     const stmt = db.prepare('INSERT INTO expenses (user_id, title, amount, category, date) VALUES (?, ?, ?, ?, ?)');
-    stmt.run(userId, title, amount, category, date);
+    await stmt.run(userId, title, amount, category, date);
 
-    const totalRow = db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ?').get(userId) as { total: number | null };
+    const totalRow = await db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ?').get(userId) as { total: number | null };
     const total = totalRow?.total || 0;
     return `Success: Added expense of $${amount} for "${title}" under category [${category}]. Total expense is now $${total}.`;
 }
 
 // 2. Get Expense Summary
-export function getExpenseSummary(userId: string): string {
-    const rows = db.prepare('SELECT title, amount, category FROM expenses WHERE user_id = ?').all(userId) as { title: string; amount: number; category: string }[];
-    if (rows.length === 0) {
+export async function getExpenseSummary(userId: string): Promise<string> {
+    const rows = await db.prepare('SELECT title, amount, category FROM expenses WHERE user_id = ?').all(userId) as { title: string; amount: number; category: string }[];
+    if (!rows || rows.length === 0) {
         return `No expenses recorded yet. Total: $0.`;
     }
-    const totalRow = db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ?').get(userId) as { total: number | null };
+    const totalRow = await db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ?').get(userId) as { total: number | null };
     const total = totalRow?.total || 0;
     const list = rows.map(e => `- ${e.title}: $${e.amount} (${e.category})`).join('\n');
     return `Total Expense: $${total}\n\nBreakdown:\n${list}`;
 }
 
 // 3. Add Task
-export function addTask(userId: string, title: string): string {
+export async function addTask(userId: string, title: string): Promise<string> {
     const date = new Date().toISOString().split('T')[0]!;
     const stmt = db.prepare('INSERT INTO tasks (user_id, title, status, date) VALUES (?, ?, ?, ?)');
-    stmt.run(userId, title, 'pending', date);
+    await stmt.run(userId, title, 'pending', date);
     return `Success: Task "${title}" added to your to-do list!`;
 }
 
 // 4. Get Pending Tasks
-export function getPendingTasks(userId: string): string {
-    const rows = db.prepare('SELECT title FROM tasks WHERE user_id = ? AND status = "pending"').all(userId) as { title: string }[];
-    if (rows.length === 0) {
+export async function getPendingTasks(userId: string): Promise<string> {
+    const rows = await db.prepare('SELECT title FROM tasks WHERE user_id = ? AND status = "pending"').all(userId) as { title: string }[];
+    if (!rows || rows.length === 0) {
         return `You have no pending tasks in your list. Everything is complete!`;
     }
     const list = rows.map((t, idx) => `${idx + 1}. ${t.title}`).join('\n');
@@ -61,9 +61,9 @@ export function getPendingTasks(userId: string): string {
 }
 
 // 0. Set Monthly Salary Tool
-export function setMonthlySalary(userId: string, salary: number): string {
+export async function setMonthlySalary(userId: string, salary: number): Promise<string> {
     try {
-        db.prepare('UPDATE users SET monthly_salary = ? WHERE id = ? OR email = ?').run(salary, userId, userId);
+        await db.prepare('UPDATE users SET monthly_salary = ? WHERE id = ? OR email = ?').run(salary, userId, userId);
         return `Success: Updated monthly income/salary to $${salary}.`;
     } catch (e) {
         return `Failed to update salary: ${e}`;
@@ -71,14 +71,14 @@ export function setMonthlySalary(userId: string, salary: number): string {
 }
 
 // 5. Dashboard Data (Live Overview + Monthly Waste & Leakage Analysis + Salary)
-export function getDashboardData(userId: string) {
-    const totalRow = db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ?').get(userId) as { total: number | null };
-    const expensesList = db.prepare('SELECT * FROM expenses WHERE user_id = ? ORDER BY id DESC LIMIT 10').all(userId) as Expense[];
+export async function getDashboardData(userId: string) {
+    const totalRow = await db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ?').get(userId) as { total: number | null };
+    const expensesList = await db.prepare('SELECT * FROM expenses WHERE user_id = ? ORDER BY id DESC LIMIT 10').all(userId) as Expense[];
     
     // Retrieve user monthly salary
     let monthlySalary = 0;
     try {
-        const userRow = db.prepare('SELECT monthly_salary FROM users WHERE id = ? OR email = ?').get(userId, userId) as { monthly_salary: number | null } | undefined;
+        const userRow = await db.prepare('SELECT monthly_salary FROM users WHERE id = ? OR email = ?').get(userId, userId) as { monthly_salary: number | null } | undefined;
         if (userRow?.monthly_salary) {
             monthlySalary = Number(userRow.monthly_salary);
         }
@@ -89,20 +89,20 @@ export function getDashboardData(userId: string) {
     // 30 days window for current month analytics
     const now = new Date();
     const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]!;
-    const monthTotalRow = db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ? AND date >= ?').get(userId, monthAgo) as { total: number | null };
+    const monthTotalRow = await db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ? AND date >= ?').get(userId, monthAgo) as { total: number | null };
     const monthTotal = monthTotalRow?.total || 0;
 
     const remainingBalance = monthlySalary > 0 ? monthlySalary - monthTotal : 0;
     const savingsRate = monthlySalary > 0 ? Math.max(0, Math.round((remainingBalance / monthlySalary) * 100)) : 0;
 
     // Monthly category breakdown
-    const catRows = db.prepare(`
+    const catRows = (await db.prepare(`
         SELECT category, SUM(amount) as total, COUNT(*) as count 
         FROM expenses 
         WHERE user_id = ? AND date >= ?
         GROUP BY category 
         ORDER BY total DESC
-    `).all(userId, monthAgo) as { category: string; total: number; count: number }[];
+    `).all(userId, monthAgo) as { category: string; total: number; count: number }[]) || [];
 
     const categoriesWithPct = catRows.map(c => ({
         category: c.category,
@@ -174,7 +174,7 @@ export function getDashboardData(userId: string) {
 }
 
 // 6. Statistics Analytics (Weekly, Monthly, Yearly Circular Ratios & Categories)
-export function getStatisticsData(userId: string) {
+export async function getStatisticsData(userId: string) {
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0]!;
     
@@ -185,10 +185,10 @@ export function getStatisticsData(userId: string) {
     // Year start
     const yearStart = `${now.getFullYear()}-01-01`;
 
-    const weekTotal = (db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ? AND date >= ?').get(userId, weekAgo) as { total: number | null })?.total || 0;
-    const monthTotal = (db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ? AND date >= ?').get(userId, monthAgo) as { total: number | null })?.total || 0;
-    const yearTotal = (db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ? AND date >= ?').get(userId, yearStart) as { total: number | null })?.total || 0;
-    const allTotal = (db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ?').get(userId) as { total: number | null })?.total || 1; // avoid / 0
+    const weekTotal = ((await db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ? AND date >= ?').get(userId, weekAgo)) as { total: number | null })?.total || 0;
+    const monthTotal = ((await db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ? AND date >= ?').get(userId, monthAgo)) as { total: number | null })?.total || 0;
+    const yearTotal = ((await db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ? AND date >= ?').get(userId, yearStart)) as { total: number | null })?.total || 0;
+    const allTotal = ((await db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ?').get(userId)) as { total: number | null })?.total || 1; // avoid / 0
 
     // Ratios (percentage of all-time or monthly budget benchmark e.g. $1000)
     const benchmarkMonth = 1500;
@@ -200,13 +200,13 @@ export function getStatisticsData(userId: string) {
     const yearPercent = Math.min(100, Math.round((yearTotal / benchmarkYear) * 100));
 
     // Category Distribution
-    const categories = db.prepare(`
+    const categories = (await db.prepare(`
         SELECT category, SUM(amount) as total, COUNT(*) as count 
         FROM expenses 
         WHERE user_id = ? 
         GROUP BY category 
         ORDER BY total DESC
-    `).all(userId) as { category: string; total: number; count: number }[];
+    `).all(userId) as { category: string; total: number; count: number }[]) || [];
 
     return {
         week: { total: weekTotal, percent: weekPercent, benchmark: benchmarkWeek },
@@ -274,17 +274,17 @@ export const toolsDeclaration = [
 ];
 
 // Tool Executor
-export function executeTool(name: string, args: any, currentUserId: string = 'guest'): string {
+export async function executeTool(name: string, args: any, currentUserId: string = 'guest'): Promise<string> {
     if (name === 'addExpense') {
-        return addExpense(currentUserId, args.title, Number(args.amount), args.category || 'General');
+        return await addExpense(currentUserId, args.title, Number(args.amount), args.category || 'General');
     } else if (name === 'getExpenseSummary') {
-        return getExpenseSummary(currentUserId);
+        return await getExpenseSummary(currentUserId);
     } else if (name === 'setMonthlySalary') {
-        return setMonthlySalary(currentUserId, Number(args.salary));
+        return await setMonthlySalary(currentUserId, Number(args.salary));
     } else if (name === 'addTask') {
-        return addTask(currentUserId, args.title);
+        return await addTask(currentUserId, args.title);
     } else if (name === 'getPendingTasks') {
-        return getPendingTasks(currentUserId);
+        return await getPendingTasks(currentUserId);
     }
     return `Error: Tool ${name} not found.`;
 }

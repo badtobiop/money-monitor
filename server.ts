@@ -81,7 +81,7 @@ const PORT = process.env.PORT || 3000;
 // ==================== AUTHENTICATION API ====================
 
 // Register a new user
-app.post('/api/auth/register', (req: Request, res: Response) => {
+app.post('/api/auth/register', async (req: Request, res: Response) => {
     try {
         const { email, name, password } = req.body;
         if (!email || !name || !password) {
@@ -89,14 +89,14 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
             return;
         }
 
-        const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase().trim());
+        const existing = await db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase().trim());
         if (existing) {
             res.status(400).json({ error: 'An account with this email already exists. Please sign in.' });
             return;
         }
 
         const createdAt = new Date().toISOString();
-        const info = db.prepare('INSERT INTO users (email, name, password, created_at) VALUES (?, ?, ?, ?)').run(
+        const info = await db.prepare('INSERT INTO users (email, name, password, created_at) VALUES (?, ?, ?, ?)').run(
             email.toLowerCase().trim(),
             name.trim(),
             password,
@@ -118,7 +118,7 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
 });
 
 // Login
-app.post('/api/auth/login', (req: Request, res: Response) => {
+app.post('/api/auth/login', async (req: Request, res: Response) => {
     try {
         const { email, password } = req.body;
         if (!email || !password) {
@@ -126,7 +126,7 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
             return;
         }
 
-        const user = db.prepare('SELECT id, email, name, password FROM users WHERE email = ?').get(email.toLowerCase().trim()) as { id: number; email: string; name: string; password: string } | undefined;
+        const user = await db.prepare('SELECT id, email, name, password FROM users WHERE email = ?').get(email.toLowerCase().trim()) as { id: number; email: string; name: string; password: string } | undefined;
         if (!user) {
             res.status(401).json({ error: 'No account found with this email. Please sign up first.' });
             return;
@@ -439,21 +439,21 @@ app.post('/api/auth/forgot-password', async (req: Request, res: Response) => {
         }
 
         const cleanEmail = email.toLowerCase().trim();
-        const user = db.prepare('SELECT id, email, name FROM users WHERE email = ?').get(cleanEmail) as { id: number; email: string; name: string } | undefined;
+        const user = await db.prepare('SELECT id, email, name FROM users WHERE email = ?').get(cleanEmail) as { id: number; email: string; name: string } | undefined;
         if (!user) {
             res.status(404).json({ error: 'No account found with this email. Please verify your email or sign up.' });
             return;
         }
 
         // Invalidate previous unused tokens for this user
-        db.prepare('UPDATE password_resets SET used = 1 WHERE user_id = ? AND used = 0').run(user.id);
+        await db.prepare('UPDATE password_resets SET used = 1 WHERE user_id = ? AND used = 0').run(user.id);
 
         // Generate cryptographically secure 32-byte token
         const token = crypto.randomBytes(32).toString('hex');
         const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes validity
         const createdAt = new Date().toISOString();
 
-        db.prepare('INSERT INTO password_resets (user_id, email, token, expires_at, created_at) VALUES (?, ?, ?, ?, ?)').run(
+        await db.prepare('INSERT INTO password_resets (user_id, email, token, expires_at, created_at) VALUES (?, ?, ?, ?, ?)').run(
             user.id,
             user.email,
             token,
@@ -494,7 +494,7 @@ app.post('/api/auth/forgot-password', async (req: Request, res: Response) => {
 });
 
 // Step 2: Validate reset token when user opens the link
-app.get('/api/auth/verify-reset-token', (req: Request, res: Response) => {
+app.get('/api/auth/verify-reset-token', async (req: Request, res: Response) => {
     try {
         const token = String(req.query.token || '').trim();
         if (!token) {
@@ -502,7 +502,7 @@ app.get('/api/auth/verify-reset-token', (req: Request, res: Response) => {
             return;
         }
 
-        const record = db.prepare('SELECT id, user_id, email, expires_at, used FROM password_resets WHERE token = ?').get(token) as { id: number; user_id: number; email: string; expires_at: number; used: number } | undefined;
+        const record = await db.prepare('SELECT id, user_id, email, expires_at, used FROM password_resets WHERE token = ?').get(token) as { id: number; user_id: number; email: string; expires_at: number; used: number } | undefined;
         if (!record) {
             res.status(400).json({ error: 'Invalid password reset link. Please request a new one.' });
             return;
@@ -529,7 +529,7 @@ app.get('/api/auth/verify-reset-token', (req: Request, res: Response) => {
 });
 
 // Step 3: Complete password reset with verified token
-app.post('/api/auth/reset-password-confirm', (req: Request, res: Response) => {
+app.post('/api/auth/reset-password-confirm', async (req: Request, res: Response) => {
     try {
         const { token, newPassword } = req.body;
         if (!token || !newPassword) {
@@ -543,7 +543,7 @@ app.post('/api/auth/reset-password-confirm', (req: Request, res: Response) => {
         }
 
         const cleanToken = String(token).trim();
-        const record = db.prepare('SELECT id, user_id, email, expires_at, used FROM password_resets WHERE token = ?').get(cleanToken) as { id: number; user_id: number; email: string; expires_at: number; used: number } | undefined;
+        const record = await db.prepare('SELECT id, user_id, email, expires_at, used FROM password_resets WHERE token = ?').get(cleanToken) as { id: number; user_id: number; email: string; expires_at: number; used: number } | undefined;
         if (!record) {
             res.status(400).json({ error: 'Invalid password reset token.' });
             return;
@@ -560,10 +560,10 @@ app.post('/api/auth/reset-password-confirm', (req: Request, res: Response) => {
         }
 
         // Update User's Password
-        db.prepare('UPDATE users SET password = ? WHERE id = ?').run(String(newPassword), record.user_id);
+        await db.prepare('UPDATE users SET password = ? WHERE id = ?').run(String(newPassword), record.user_id);
 
         // Invalidate Token (mark as used)
-        db.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').run(record.id);
+        await db.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').run(record.id);
 
         console.log(`✅ [SECURITY] Password reset successful for user ID ${record.user_id} (${record.email})`);
 
@@ -581,10 +581,10 @@ app.post('/api/auth/reset-password-confirm', (req: Request, res: Response) => {
 // ==================== DASHBOARD & ANALYTICS API ====================
 
 // Live Dashboard Data
-app.get('/api/dashboard/:userId', (req: Request, res: Response) => {
+app.get('/api/dashboard/:userId', async (req: Request, res: Response) => {
     try {
         const userId = String(req.params.userId || 'default_user');
-        const data = getDashboardData(userId);
+        const data = await getDashboardData(userId);
         res.json(data);
     } catch (error) {
         console.error('Dashboard Error:', error);
@@ -593,12 +593,12 @@ app.get('/api/dashboard/:userId', (req: Request, res: Response) => {
 });
 
 // Update Monthly Salary / Income
-app.post('/api/user/:userId/salary', (req: Request, res: Response) => {
+app.post('/api/user/:userId/salary', async (req: Request, res: Response) => {
     try {
         const userId = String(req.params.userId || 'default_user');
         const { salary } = req.body;
         const num = Number(salary) || 0;
-        db.prepare('UPDATE users SET monthly_salary = ? WHERE id = ? OR email = ?').run(num, userId, userId);
+        await db.prepare('UPDATE users SET monthly_salary = ? WHERE id = ? OR email = ?').run(num, userId, userId);
         res.json({ success: true, salary: num });
     } catch (error) {
         console.error('Salary Update Error:', error);
@@ -607,10 +607,10 @@ app.post('/api/user/:userId/salary', (req: Request, res: Response) => {
 });
 
 // Statistics & Analytics (Weekly, Monthly, Yearly Circular Ratios)
-app.get('/api/statistics/:userId', (req: Request, res: Response) => {
+app.get('/api/statistics/:userId', async (req: Request, res: Response) => {
     try {
         const userId = String(req.params.userId || 'default_user');
-        const data = getStatisticsData(userId);
+        const data = await getStatisticsData(userId);
         res.json(data);
     } catch (error) {
         console.error('Stats Error:', error);
@@ -619,16 +619,16 @@ app.get('/api/statistics/:userId', (req: Request, res: Response) => {
 });
 
 // Toggle Task
-app.post('/api/tasks/:id/toggle', (req: Request, res: Response) => {
+app.post('/api/tasks/:id/toggle', async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const task = db.prepare('SELECT status FROM tasks WHERE id = ?').get(id) as { status: string } | undefined;
+        const task = await db.prepare('SELECT status FROM tasks WHERE id = ?').get(id) as { status: string } | undefined;
         if (!task) {
             res.status(404).json({ error: 'Task not found' });
             return;
         }
         const newStatus = task.status === 'completed' ? 'pending' : 'completed';
-        db.prepare('UPDATE tasks SET status = ? WHERE id = ?').run(newStatus, id);
+        await db.prepare('UPDATE tasks SET status = ? WHERE id = ?').run(newStatus, id);
         res.json({ success: true, newStatus });
     } catch (error) {
         res.status(500).json({ error: 'Failed to toggle task' });
@@ -636,10 +636,10 @@ app.post('/api/tasks/:id/toggle', (req: Request, res: Response) => {
 });
 
 // Delete Expense
-app.delete('/api/expenses/:id', (req: Request, res: Response) => {
+app.delete('/api/expenses/:id', async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        db.prepare('DELETE FROM expenses WHERE id = ?').run(id);
+        await db.prepare('DELETE FROM expenses WHERE id = ?').run(id);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete expense' });
@@ -667,7 +667,7 @@ app.post('/api/support/contact', async (req: Request, res: Response) => {
         const createdAt = new Date().toISOString();
 
         // 1. Save ticket in database
-        const info = db.prepare(`
+        const info = await db.prepare(`
             INSERT INTO support_tickets (user_id, user_name, user_email, category, priority, subject, message, status, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?)
         `).run(
@@ -708,10 +708,10 @@ app.post('/api/support/contact', async (req: Request, res: Response) => {
 });
 
 // Get user's submitted support tickets
-app.get('/api/support/tickets/:userId', (req: Request, res: Response) => {
+app.get('/api/support/tickets/:userId', async (req: Request, res: Response) => {
     try {
         const { userId } = req.params;
-        const tickets = db.prepare(`
+        const tickets = await db.prepare(`
             SELECT id, category, priority, subject, message, status, created_at 
             FROM support_tickets 
             WHERE user_id = ? OR user_email = ? 
@@ -739,7 +739,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
             const toolName = call.name || '';
             console.log(`🤖 [AGENT ACTION for "${userId}"] Tool: "${toolName}"`, call.args);
 
-            const toolResult = executeTool(toolName, call.args, userId);
+            const toolResult = await executeTool(toolName, call.args, userId);
 
             response = await chat.sendMessage({
                 message: [
@@ -764,6 +764,10 @@ app.post('/api/chat', async (req: Request, res: Response) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`server running on http://localhost:${PORT}`);
-});
+export default app;
+
+if (!process.env.VERCEL) {
+    app.listen(PORT, () => {
+        console.log(`server running on http://localhost:${PORT}`);
+    });
+}
