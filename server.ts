@@ -187,13 +187,13 @@ app.post('/api/auth/google-login', async (req: Request, res: Response) => {
         }
 
         // Check if user exists in SQLite database
-        let user = db.prepare('SELECT id, email, name FROM users WHERE email = ?').get(email) as { id: number; email: string; name: string } | undefined;
+        let user = (await db.prepare('SELECT id, email, name FROM users WHERE email = ?').get(email)) as { id: number; email: string; name: string } | undefined;
 
         if (!user) {
             // Auto-register user with secure random password for OAuth accounts
             const randomPassword = crypto.randomBytes(16).toString('hex');
             const createdAt = new Date().toISOString();
-            const info = db.prepare('INSERT INTO users (email, name, password, monthly_salary, created_at) VALUES (?, ?, ?, 0, ?)').run(
+            const info = await db.prepare('INSERT INTO users (email, name, password, monthly_salary, created_at) VALUES (?, ?, ?, 0, ?)').run(
                 email,
                 name,
                 randomPassword,
