@@ -72,37 +72,33 @@ export async function setMonthlySalary(userId: string, salary: number): Promise<
 
 // 5. Dashboard Data (Live Overview + Monthly Waste & Leakage Analysis + Salary)
 export async function getDashboardData(userId: string) {
-    const totalRow = await db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ?').get(userId) as { total: number | null };
-    const expensesList = await db.prepare('SELECT * FROM expenses WHERE user_id = ? ORDER BY id DESC LIMIT 10').all(userId) as Expense[];
-    
-    // Retrieve user monthly salary
-    let monthlySalary = 0;
-    try {
-        const userRow = await db.prepare('SELECT monthly_salary FROM users WHERE id = ? OR email = ?').get(userId, userId) as { monthly_salary: number | null } | undefined;
-        if (userRow?.monthly_salary) {
-            monthlySalary = Number(userRow.monthly_salary);
-        }
-    } catch (e) {
-        console.error('Failed to get user salary:', e);
-    }
-
     // 30 days window for current month analytics
     const now = new Date();
     const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]!;
-    const monthTotalRow = await db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ? AND date >= ?').get(userId, monthAgo) as { total: number | null };
-    const monthTotal = monthTotalRow?.total || 0;
 
+    // FAST PARALLEL QUERIES: Run all 5 database queries concurrently in single roundtrip
+    const [totalRow, expensesList, userRow, monthTotalRow, catRows] = await Promise.all([
+        db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ?').get(userId) as Promise<{ total: number | null }>,
+        db.prepare('SELECT * FROM expenses WHERE user_id = ? ORDER BY id DESC LIMIT 10').all(userId) as Promise<Expense[]>,
+        db.prepare('SELECT monthly_salary FROM users WHERE id = ? OR email = ?').get(userId, userId).catch(() => null) as Promise<{ monthly_salary: number | null } | undefined>,
+        db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ? AND date >= ?').get(userId, monthAgo) as Promise<{ total: number | null }>,
+        db.prepare(`
+            SELECT category, SUM(amount) as total, COUNT(*) as count 
+            FROM expenses 
+            WHERE user_id = ? AND date >= ?
+            GROUP BY category 
+            ORDER BY total DESC
+        `).all(userId, monthAgo).catch(() => []) as Promise<{ category: string; total: number; count: number }[]>
+    ]);
+
+    let monthlySalary = 0;
+    if (userRow?.monthly_salary) {
+        monthlySalary = Number(userRow.monthly_salary);
+    }
+
+    const monthTotal = monthTotalRow?.total || 0;
     const remainingBalance = monthlySalary > 0 ? monthlySalary - monthTotal : 0;
     const savingsRate = monthlySalary > 0 ? Math.max(0, Math.round((remainingBalance / monthlySalary) * 100)) : 0;
-
-    // Monthly category breakdown
-    const catRows = (await db.prepare(`
-        SELECT category, SUM(amount) as total, COUNT(*) as count 
-        FROM expenses 
-        WHERE user_id = ? AND date >= ?
-        GROUP BY category 
-        ORDER BY total DESC
-    `).all(userId, monthAgo) as { category: string; total: number; count: number }[]) || [];
 
     const categoriesWithPct = catRows.map(c => ({
         category: c.category,
@@ -185,10 +181,25 @@ export async function getStatisticsData(userId: string) {
     // Year start
     const yearStart = `${now.getFullYear()}-01-01`;
 
-    const weekTotal = ((await db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ? AND date >= ?').get(userId, weekAgo)) as { total: number | null })?.total || 0;
-    const monthTotal = ((await db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ? AND date >= ?').get(userId, monthAgo)) as { total: number | null })?.total || 0;
-    const yearTotal = ((await db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ? AND date >= ?').get(userId, yearStart)) as { total: number | null })?.total || 0;
-    const allTotal = ((await db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ?').get(userId)) as { total: number | null })?.total || 1; // avoid / 0
+    // FAST PARALLEL QUERIES: Run all 5 stats queries simultaneously in single roundtrip
+    const [weekRow, monthRow, yearRow, allRow, catRows] = await Promise.all([
+        db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ? AND date >= ?').get(userId, weekAgo) as Promise<{ total: number | null }>,
+        db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ? AND date >= ?').get(userId, monthAgo) as Promise<{ total: number | null }>,
+        db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ? AND date >= ?').get(userId, yearStart) as Promise<{ total: number | null }>,
+        db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ?').get(userId) as Promise<{ total: number | null }>,
+        db.prepare(`
+            SELECT category, SUM(amount) as total, COUNT(*) as count 
+            FROM expenses 
+            WHERE user_id = ? 
+            GROUP BY category 
+            ORDER BY total DESC
+        `).all(userId).catch(() => []) as Promise<{ category: string; total: number; count: number }[]>
+    ]);
+
+    const weekTotal = weekRow?.total || 0;
+    const monthTotal = monthRow?.total || 0;
+    const yearTotal = yearRow?.total || 0;
+    const allTotal = allRow?.total || 1; // avoid / 0
 
     // Ratios (percentage of all-time or monthly budget benchmark e.g. $1000)
     const benchmarkMonth = 1500;
@@ -200,13 +211,7 @@ export async function getStatisticsData(userId: string) {
     const yearPercent = Math.min(100, Math.round((yearTotal / benchmarkYear) * 100));
 
     // Category Distribution
-    const categories = (await db.prepare(`
-        SELECT category, SUM(amount) as total, COUNT(*) as count 
-        FROM expenses 
-        WHERE user_id = ? 
-        GROUP BY category 
-        ORDER BY total DESC
-    `).all(userId) as { category: string; total: number; count: number }[]) || [];
+    const categories = catRows || [];
 
     return {
         week: { total: weekTotal, percent: weekPercent, benchmark: benchmarkWeek },

@@ -33,5 +33,8 @@
       "source": "/",
       "destination": "/index.html"
     }
+  ],
+  "regions": [
+    "bom1"
   ]
 }
