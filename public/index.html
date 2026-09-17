@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aura | Autonomous AI Expense & Task Hub</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- Google Identity Services (One-Tap & Sign-In) -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+    <!-- AUTH MODAL (Shown when not logged in) -->
+    <div id="auth-modal" class="auth-overlay">
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="auth-logo">✦ Aura AI</div>
+                <h2 id="auth-title">Log In to Your Account</h2>
+                <p id="auth-subtitle">Enter your email and password to access your financial workspace</p>
+            </div>
+
+            <!-- TAB SWITCHER: LOG IN / SIGN UP / FORGOT PASSWORD -->
+            <div class="auth-tabs" id="auth-tabs">
+                <button type="button" class="auth-tab-btn active" id="tab-login-btn" onclick="setAuthMode('login')">🔑 Log In</button>
+                <button type="button" class="auth-tab-btn" id="tab-signup-btn" onclick="setAuthMode('signup')">✨ Sign Up</button>
+                <button type="button" class="auth-tab-btn" id="tab-reset-btn" onclick="setAuthMode('forgot')">🔄 Forgot Password</button>
+            </div>
+
+            <form id="auth-form" class="auth-form">
+                <!-- Full Name (Only in Sign Up mode) -->
+                <div class="input-group" id="name-group" style="display: none;">
+                    <label for="auth-name">Full Name</label>
+                    <input type="text" id="auth-name" placeholder="Enter your full name" autocomplete="name">
+                </div>
+
+                <!-- Email Address (Shown in Login, Sign Up, and Forgot Password modes) -->
+                <div class="input-group" id="email-group">
+                    <label for="auth-email">Email Address</label>
+                    <input type="email" id="auth-email" placeholder="Enter your email address" required autocomplete="email">
+                </div>
+
+                <!-- Password / New Password Field -->
+                <div class="input-group" id="password-group">
+                    <div class="label-row">
+                        <label for="auth-password" id="password-label">Password</label>
+                        <button type="button" class="link-btn" id="forgot-password-link" onclick="setAuthMode('forgot')">Forgot Password?</button>
+                    </div>
+                    <div class="password-input-wrapper">
+                        <input type="password" id="auth-password" placeholder="Enter your password" required autocomplete="current-password">
+                        <button type="button" class="password-toggle-btn" id="password-toggle-btn" title="Show / Hide Password">👁️</button>
+                    </div>
+                </div>
+
+                <!-- Confirm New Password (Only in Set New Password mode) -->
+                <div class="input-group" id="confirm-password-group" style="display: none;">
+                    <label for="auth-confirm-password">Confirm New Password</label>
+                    <div class="password-input-wrapper">
+                        <input type="password" id="auth-confirm-password" placeholder="Confirm your new password" autocomplete="new-password">
+                        <button type="button" class="password-toggle-btn" id="confirm-password-toggle-btn" title="Show / Hide Password">👁️</button>
+                    </div>
+                </div>
+
+                <!-- Feedback Messages -->
+                <div id="auth-error" class="auth-error" style="display: none;"></div>
+                <div id="auth-success" class="auth-success" style="display: none;"></div>
+
+                <button type="submit" id="auth-submit-btn" class="btn-primary auth-btn">Log In</button>
+            </form>
+
+            <!-- GOOGLE ONE-TAP & SIGN-IN -->
+            <div id="g_id_onload"
+                 data-client_id="786991397900-g07b4v23aa9sb1f5j57184f0qrvgs84v.apps.googleusercontent.com"
+                 data-context="signin"
+                 data-ux_mode="popup"
+                 data-callback="handleGoogleLogin"
+                 data-auto_prompt="true">
+            </div>
+
+            <div class="auth-divider" id="google-auth-divider">
+                <span>OR CONTINUE WITH</span>
+            </div>
+
+            <div id="google-signin-wrapper" style="display: flex; justify-content: center; width: 100%; margin: 12px 0 16px 0;">
+                <div class="g_id_signin" 
+                     data-type="standard" 
+                     data-shape="rectangular" 
+                     data-theme="outline" 
+                     data-text="signin_with" 
+                     data-size="large" 
+                     data-logo_alignment="left"
+                     data-width="320">
+                </div>
+            </div>
+
+            <div class="auth-toggle">
+                <span id="auth-toggle-text">Don't have an account yet?</span>
+                <button type="button" id="auth-toggle-btn" onclick="toggleAuthMode()">Sign Up</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APPLICATION (Protected Workspace) -->
+    <div class="dashboard-wrapper" id="dashboard-app" style="display: none;">
+        
+        <!-- LEFT SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-icon">✦</div>
+                <div class="brand-text">
+                    <span class="brand-name">Aura</span>
+                    <span class="brand-badge">Autonomous AI</span>
+                </div>
+            </div>
+
+            <!-- NAVIGATION LINKS WITH CIRCLE ICONS -->
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-view="view-dashboard">
+                    <div class="nav-icon-circle">📊</div>
+                    <span class="nav-label">Dashboard</span>
+                </button>
+                <button class="nav-item" data-view="view-statistics">
+                    <div class="nav-icon-circle">📈</div>
+                    <span class="nav-label">Statistics</span>
+                </button>
+                <button class="nav-item" data-view="view-settings">
+                    <div class="nav-icon-circle">⚙️</div>
+                    <span class="nav-label">Settings</span>
+                </button>
+                <button class="nav-item" data-view="view-help">
+                    <div class="nav-icon-circle">💬</div>
+                    <span class="nav-label">Help Center</span>
+                </button>
+            </nav>
+
+            <!-- MONTHLY SALARY / INCOME TRACKER WIDGET -->
+            <div class="salary-sidebar-widget">
+                <div class="salary-widget-header">
+                    <div class="salary-widget-title">
+                        <span class="salary-icon-circle">💰</span>
+                        <div>
+                            <div class="salary-widget-label">Monthly Salary</div>
+                            <div class="salary-widget-amount" id="sidebar-salary-display">₹0</div>
+                        </div>
+                    </div>
+                    <button class="salary-edit-btn" id="sidebar-salary-edit-btn" title="Set Monthly Salary">✏️</button>
+                </div>
+                
+                <!-- Quick Salary Edit Input Row (Toggled via edit button) -->
+                <div class="salary-input-row" id="salary-input-row" style="display: none;">
+                    <input type="number" id="sidebar-salary-input" placeholder="Enter salary (e.g. 50000)" step="100">
+                    <button id="sidebar-salary-save-btn" class="salary-save-btn">Save</button>
+                </div>
+
+                <!-- Balance / Savings Mini Summary -->
+                <div class="salary-mini-stats">
+                    <div class="salary-stat-row">
+                        <span>Spent:</span>
+                        <strong id="sidebar-salary-spent">₹0</strong>
+                    </div>
+                    <div class="salary-stat-row">
+                        <span>Remaining:</span>
+                        <strong id="sidebar-salary-balance" class="text-emerald">₹0</strong>
+                    </div>
+                    <div class="salary-bar-track">
+                        <div class="salary-bar-fill" id="sidebar-salary-progress" style="width: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SIDEBAR FOOTER / USER PROFILE -->
+            <div class="sidebar-footer">
+                <div class="user-chip">
+                    <div class="user-avatar" id="sidebar-avatar">U</div>
+                    <div class="user-info">
+                        <div class="user-name" id="sidebar-username">User</div>
+                        <div class="user-email" id="sidebar-email">user@email.com</div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                    <button type="button" id="sidebar-signup-btn" class="logout-btn" title="Create New Account / Sign Up" style="background: rgba(225, 29, 72, 0.2); border-color: rgba(225, 29, 72, 0.4); color: #fda4af;" onclick="window.logout('signup')">✨ Sign Up</button>
+                    <button type="button" id="logout-btn" class="logout-btn" title="Sign Out">🚪 Logout</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT AREA -->
+        <div class="content-viewport" id="scroll-container">
+            
+            <!-- TOP BAR -->
+            <header class="content-header">
+                <div>
+                    <h1 class="page-title" id="page-heading">Dashboard</h1>
+                    <p class="page-subtitle" id="page-subheading">Personal overview and financial insights</p>
+                </div>
+                <div class="header-actions">
+                    <div class="currency-pill">
+                        <span>Currency:</span>
+                        <select id="currency-select">
+                            <option value="$">USD ($)</option>
+                            <option value="₹" selected>INR (₹)</option>
+                            <option value="€">EUR (€)</option>
+                        </select>
+                    </div>
+                    <button class="btn-secondary" id="manual-refresh-btn">🔄 Refresh</button>
+                </div>
+            </header>
+
+            <!-- VIEW 1: DASHBOARD -->
+            <div class="view-panel" id="view-dashboard">
+                <!-- KPI STATS CARDS (4 COLUMNS: SALARY, SPEND, SAVINGS, LEAKAGE) -->
+                <div class="kpi-grid">
+                    <!-- KPI 1: Monthly Salary / Income -->
+                    <div class="kpi-card card-salary">
+                        <div class="kpi-header">
+                            <span>Monthly Salary</span>
+                            <button class="kpi-edit-link" id="kpi-salary-edit-btn" title="Set Salary">✏️ Edit</button>
+                        </div>
+                        <div class="kpi-value" id="kpi-salary-display">₹0</div>
+                        <div class="kpi-note" id="kpi-salary-note">Click edit to enter salary</div>
+                    </div>
+
+                    <!-- KPI 2: Spent This Month -->
+                    <div class="kpi-card card-spent">
+                        <div class="kpi-header">
+                            <span>Month Spend</span>
+                            <span class="kpi-tag tag-rose">This Month</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-month-spent">₹0</div>
+                        <div class="kpi-note" id="kpi-budget-status">Total spent in last 30 days</div>
+                    </div>
+
+                    <!-- KPI 3: Net Savings Balance -->
+                    <div class="kpi-card card-primary">
+                        <div class="kpi-header">
+                            <span>Remaining Balance</span>
+                            <span class="kpi-tag" id="kpi-savings-tag">100% Saved</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-savings-balance">₹0</div>
+                        <div class="kpi-note">Salary minus monthly spending</div>
+                    </div>
+
+                    <!-- KPI 4: Top Spending Driver / Leakage -->
+                    <div class="kpi-card" id="kpi-leakage-card">
+                        <div class="kpi-header">
+                            <span>Top Spend Driver</span>
+                            <span class="kpi-tag" id="kpi-leakage-tag">Analyzing</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-top-category">None</div>
+                        <div class="kpi-note" id="kpi-top-category-note">Highest expense category</div>
+                    </div>
+                </div>
+
+                <!-- QUICK MANUAL EXPENSE CREATION -->
+                <div class="glass-card add-card">
+                    <div class="card-heading">
+                        <h3>⚡ Quick Record Expense</h3>
+                        <span class="card-caption">Or simply instruct the AI Agent via chat!</span>
+                    </div>
+                    <form id="quick-expense-form" class="quick-form">
+                        <input type="text" id="quick-title" placeholder="Enter item description (e.g. Groceries, Gym, Coffee)" required>
+                        <input type="number" id="quick-amount" placeholder="Enter amount" step="0.01" required>
+                        <select id="quick-category">
+                            <option value="Groceries">Groceries & Food (Essential)</option>
+                            <option value="Dining">Dining & Takeout (Discretionary)</option>
+                            <option value="Shopping">Shopping & Fashion (Discretionary)</option>
+                            <option value="Entertainment">Entertainment & Media (Discretionary)</option>
+                            <option value="Bills">Utilities & Bills (Essential)</option>
+                            <option value="Travel">Travel & Commute</option>
+                            <option value="Health">Health & Fitness (Essential)</option>
+                            <option value="Tech">Gadgets & Tech</option>
+                        </select>
+                        <button type="submit" class="btn-primary" id="quick-add-btn"><span>➕</span> Add Expense</button>
+                    </form>
+                </div>
+
+                <!-- SPLIT SECTION: EXPENSES & LEAKAGE ADVISOR -->
+                <div class="dashboard-split">
+                    <!-- EXPENSES TABLE -->
+                    <div class="glass-card split-col">
+                        <div class="card-heading">
+                            <h3>💳 Recent Expenses</h3>
+                            <span class="badge" id="expenses-count-badge">0 items</span>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Description</th>
+                                        <th>Category</th>
+                                        <th>Amount</th>
+                                        <th>Date</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="expenses-tbody">
+                                    <tr>
+                                        <td colspan="5" class="empty-cell">No expenses logged yet. Tell the AI Agent or use quick add!</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- MONTHLY EXPENSE LEAKAGE & CONTROL ADVISOR -->
+                    <div class="glass-card split-col leakage-advisor-card">
+                        <div class="card-heading">
+                            <h3>🎯 Monthly Leakage & Control Advisor</h3>
+                            <span class="badge" id="leakage-status-badge">Safe Zone</span>
+                        </div>
+
+                        <!-- AI Control Advice Alert Box -->
+                        <div class="advice-box" id="advice-box">
+                            <div class="advice-header">
+                                <span class="advice-icon" id="advice-icon">⚡</span>
+                                <span class="advice-title" id="advice-title">Smart Spending Recommendation</span>
+                            </div>
+                            <p class="advice-text" id="advice-text">
+                                Log your expenses to see which categories consume the most budget and where to cut down!
+                            </p>
+                        </div>
+
+                        <!-- Needs vs Wants Comparison Meter -->
+                        <div class="ratio-meter-section">
+                            <div class="meter-label-row">
+                                <span><strong>Needs (Essentials):</strong> <span id="meter-essential-val">0%</span></span>
+                                <span><strong>Wants (Waste/Discretionary):</strong> <span id="meter-discretionary-val" class="text-warning">0%</span></span>
+                            </div>
+                            <div class="stacked-bar">
+                                <div class="bar-essential" id="bar-essential" style="width: 50%;"></div>
+                                <div class="bar-discretionary" id="bar-discretionary" style="width: 50%;"></div>
+                            </div>
+                            <div class="meter-caption">Benchmark: Max 30% on discretionary/waste spending</div>
+                        </div>
+
+                        <!-- Category Leakage Breakdown List -->
+                        <div class="leakage-breakdown">
+                            <div class="subhead-row">
+                                <h4 class="subhead">Monthly Category Consumption</h4>
+                                <span class="subhead-tip">Sorted by highest spend</span>
+                            </div>
+                            <div class="leakage-items-list" id="leakage-items-list">
+                                <div class="empty-cell">No expenses logged this month yet.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 2: STATISTICS & CIRCULAR RATIOS -->
+            <div class="view-panel" id="view-statistics" style="display: none;">
+                <div class="stats-intro">
+                    <h2>Spending Ratio & Timeline Breakdown</h2>
+                    <p>Calculated dynamic percentages across your current week, month, and year.</p>
+                </div>
+
+                <!-- CIRCULAR RATIOS GRID -->
+                <div class="circles-grid">
+                    <!-- WEEKLY RATIO -->
+                    <div class="glass-card circle-card">
+                        <div class="circle-title">Weekly Ratio</div>
+                        <div class="circle-wrapper">
+                            <svg class="progress-ring" width="160" height="160">
+                                <circle class="progress-ring-bg" stroke="#f1f5f9" stroke-width="12" fill="transparent" r="66" cx="80" cy="80"/>
+                                <circle id="circle-week" class="progress-ring-circle stroke-teal" stroke-width="12" stroke-dasharray="414.69" stroke-dashoffset="414.69" stroke-linecap="round" fill="transparent" r="66" cx="80" cy="80"/>
+                            </svg>
+                            <div class="circle-text">
+                                <span class="circle-val" id="stat-week-pct">0%</span>
+                                <span class="circle-sub" id="stat-week-amt">₹0 spent</span>
+                            </div>
+                        </div>
+                        <div class="circle-meta">Benchmark: ₹400/wk</div>
+                    </div>
+
+                    <!-- MONTHLY RATIO -->
+                    <div class="glass-card circle-card">
+                        <div class="circle-title">Monthly Ratio</div>
+                        <div class="circle-wrapper">
+                            <svg class="progress-ring" width="160" height="160">
+                                <circle class="progress-ring-bg" stroke="#f1f5f9" stroke-width="12" fill="transparent" r="66" cx="80" cy="80"/>
+                                <circle id="circle-month" class="progress-ring-circle stroke-indigo" stroke-width="12" stroke-dasharray="414.69" stroke-dashoffset="414.69" stroke-linecap="round" fill="transparent" r="66" cx="80" cy="80"/>
+                            </svg>
+                            <div class="circle-text">
+                                <span class="circle-val" id="stat-month-pct">0%</span>
+                                <span class="circle-sub" id="stat-month-amt">₹0 spent</span>
+                            </div>
+                        </div>
+                        <div class="circle-meta">Benchmark: ₹1,500/mo</div>
+                    </div>
+
+                    <!-- YEARLY RATIO -->
+                    <div class="glass-card circle-card">
+                        <div class="circle-title">Yearly Ratio</div>
+                        <div class="circle-wrapper">
+                            <svg class="progress-ring" width="160" height="160">
+                                <circle class="progress-ring-bg" stroke="#f1f5f9" stroke-width="12" fill="transparent" r="66" cx="80" cy="80"/>
+                                <circle id="circle-year" class="progress-ring-circle stroke-rose" stroke-width="12" stroke-dasharray="414.69" stroke-dashoffset="414.69" stroke-linecap="round" fill="transparent" r="66" cx="80" cy="80"/>
+                            </svg>
+                            <div class="circle-text">
+                                <span class="circle-val" id="stat-year-pct">0%</span>
+                                <span class="circle-sub" id="stat-year-amt">₹0 spent</span>
+                            </div>
+                        </div>
+                        <div class="circle-meta">Benchmark: ₹15,000/yr</div>
+                    </div>
+                </div>
+
+                <!-- CATEGORY DISTRIBUTION BARS -->
+                <div class="glass-card cat-card">
+                    <div class="card-heading">
+                        <h3>🏷️ Category Distribution</h3>
+                        <span class="card-caption">Proportional expense allocation</span>
+                    </div>
+                    <div id="category-bars-container" class="cat-bars-list">
+                        <div class="empty-cell">No categories available yet. Add expenses to view analysis!</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 3: SETTINGS -->
+            <div class="view-panel" id="view-settings" style="display: none;">
+                <div class="glass-card settings-box">
+                    <h3>Account Profile</h3>
+                    <p class="settings-desc">Your personal account credentials and storage details.</p>
+                    
+                    <div class="settings-row">
+                        <div>
+                            <strong>Full Name:</strong>
+                            <div id="settings-name-display" class="settings-val">-</div>
+                        </div>
+                    </div>
+                    <div class="settings-row">
+                        <div>
+                            <strong>Email Address:</strong>
+                            <div id="settings-email-display" class="settings-val">-</div>
+                        </div>
+                    </div>
+                    <div class="settings-row">
+                        <div>
+                            <strong>Storage Engine:</strong>
+                            <div class="settings-val">Embedded SQLite (WAL Mode) in <code>agent_data.db</code></div>
+                        </div>
+                    </div>
+                    <div class="settings-row">
+                        <div>
+                            <strong>AI Model:</strong>
+                            <div class="settings-val">Google Gemini Flash (Function Calling Autonomous Loop)</div>
+                        </div>
+                    </div>
+
+                    <div class="settings-actions" style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 15px;">
+                        <button type="button" class="btn-primary" id="settings-signup-new-btn" style="background: linear-gradient(135deg, #e11d48, #be123c); padding: 10px 18px; font-size: 0.86rem; border-radius: 8px;" onclick="window.logout('signup')">✨ Create New Account / Sign Up</button>
+                        <button type="button" class="btn-danger" id="settings-logout-btn">Log Out of This Session</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 4: HELP CENTER & SUPPORT -->
+            <div class="view-panel" id="view-help" style="display: none;">
+                <!-- HERO BANNER -->
+                <div class="glass-card help-hero-card">
+                    <div class="help-hero-content">
+                        <div class="help-hero-badge">
+                            <span class="pulse-dot-green"></span> Admin Desk Connected
+                        </div>
+                        <h2>How can we help you today?</h2>
+                        <p>Send a direct message to our administration team. Your message will be dispatched in real-time to the admin's Gmail, and their response will arrive straight in your registered email.</p>
+                    </div>
+                    <div class="help-hero-meta">
+                        <div class="help-meta-item">
+                            <span class="help-meta-icon">⚡</span>
+                            <div>
+                                <strong>Fast Response</strong>
+                                <span>Direct Gmail alert</span>
+                            </div>
+                        </div>
+                        <div class="help-meta-item">
+                            <span class="help-meta-icon">🔒</span>
+                            <div>
+                                <strong>Secure & Isolated</strong>
+                                <span>End-to-end tracked</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2-COLUMN SPLIT: SUPPORT FORM + FAQ & KNOWLEDGE -->
+                <div class="help-layout-grid">
+                    <!-- LEFT: SUBMIT TICKET FORM -->
+                    <div class="glass-card help-form-card">
+                        <div class="card-heading">
+                            <h3>✉️ Contact Admin Desk</h3>
+                            <span class="badge badge-rose">Direct Gmail Dispatch</span>
+                        </div>
+                        
+                        <form id="support-ticket-form" class="support-form">
+                            <div class="form-row-2col">
+                                <div class="input-group">
+                                    <label for="support-name">Your Full Name</label>
+                                    <input type="text" id="support-name" placeholder="Loading name..." required>
+                                </div>
+                                <div class="input-group">
+                                    <label for="support-email">Your Email Address</label>
+                                    <input type="email" id="support-email" placeholder="Loading email..." required>
+                                </div>
+                            </div>
+
+                            <div class="form-row-2col">
+                                <div class="input-group">
+                                    <label for="support-category">Category / Topic</label>
+                                    <select id="support-category" required>
+                                        <option value="General Inquiry" selected>General Inquiry</option>
+                                        <option value="Technical Issue">Technical Issue</option>
+                                        <option value="Expense & Salary Tracking">Expense & Salary Tracking</option>
+                                        <option value="Autonomous AI Feedback">Autonomous AI Feedback</option>
+                                        <option value="Account & Security">Account & Security</option>
+                                        <option value="Feature Request">Feature Request</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label for="support-priority">Priority Level</label>
+                                    <select id="support-priority" required>
+                                        <option value="Normal" selected>🟢 Normal</option>
+                                        <option value="High">🟠 High Priority</option>
+                                        <option value="Urgent">🚨 Urgent (Immediate)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="input-group">
+                                <label for="support-subject">Subject</label>
+                                <input type="text" id="support-subject" placeholder="Brief summary of your question or issue" required autocomplete="off">
+                            </div>
+
+                            <div class="input-group">
+                                <label for="support-message">Detailed Message</label>
+                                <textarea id="support-message" rows="5" placeholder="Explain your question, issue, or feedback in detail so the admin can assist you effectively..." required></textarea>
+                            </div>
+
+                            <div id="support-error" class="auth-error" style="display: none; margin-bottom: 12px;"></div>
+                            <div id="support-success" class="auth-success" style="display: none; margin-bottom: 12px;"></div>
+
+                            <div class="support-btn-row">
+                                <button type="submit" id="support-submit-btn" class="btn-primary support-submit-btn">
+                                    <span>🚀</span> Send Message to Admin
+                                </button>
+                                <span class="support-hint">Replies will arrive in your Gmail inbox</span>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- RIGHT: FAQS & QUICK HELP -->
+                    <div class="help-sidebar-col">
+                        <!-- FAQ CARD -->
+                        <div class="glass-card faq-card">
+                            <div class="card-heading">
+                                <h3>💡 Frequently Asked Questions</h3>
+                            </div>
+                            <div class="faq-list">
+                                <div class="faq-item">
+                                    <h4 class="faq-q">Where does my message go when I send it?</h4>
+                                    <p class="faq-a">Your message is securely stored in the system database and immediately dispatched as an email notification directly to the admin's personal Gmail inbox.</p>
+                                </div>
+                                <div class="faq-item">
+                                    <h4 class="faq-q">How will I receive the admin's reply?</h4>
+                                    <p class="faq-a">When the admin clicks "Reply" in their Gmail app, the email reply is sent directly to your email address. You will see it directly in your inbox!</p>
+                                </div>
+                                <div class="faq-item">
+                                    <h4 class="faq-q">Can I also use the Autonomous AI Agent?</h4>
+                                    <p class="faq-a">Yes! For immediate expense entry, salary calculations, and task updates, simply tap the floating <strong>🤖 robot button</strong> at the bottom-right corner to chat with Aura AI anytime.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- LIVE TICKET HISTORY CARD -->
+                        <div class="glass-card tickets-history-card">
+                            <div class="card-heading">
+                                <h3>📋 Your Recent Tickets</h3>
+                                <button type="button" id="refresh-tickets-btn" class="kpi-edit-link" title="Refresh Tickets">🔄 Refresh</button>
+                            </div>
+                            <div id="user-tickets-list" class="tickets-list">
+                                <div class="empty-cell" style="padding: 16px; font-size: 0.82rem;">No support tickets submitted yet.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- FLOATING AI AGENT TRIGGER BUTTON (Bottom-Right Circle) -->
+    <button id="ai-fab-btn" class="ai-fab" aria-label="Open AI Assistant" title="Chat with AI Agent">
+        <div class="ai-fab-ripple"></div>
+        <div class="ai-fab-glow"></div>
+        <span class="ai-fab-icon">🤖</span>
+        <span class="ai-fab-pulse-dot"></span>
+    </button>
+
+    <!-- RIGHT-SIDE SLIDE-OUT AI AGENT DRAWER -->
+    <aside id="ai-drawer" class="ai-drawer">
+        <div class="drawer-header">
+            <div class="drawer-header-info">
+                <div class="drawer-avatar">✦</div>
+                <div>
+                    <h3 class="drawer-title">Aura AI Agent</h3>
+                    <p class="drawer-subtitle">Autonomous Tool Calling (English)</p>
+                </div>
+            </div>
+            <button id="drawer-close-btn" class="drawer-close" title="Close Drawer">✕</button>
+        </div>
+
+        <!-- DRAWER CHAT MESSAGES -->
+        <div class="drawer-messages" id="drawer-chat-box">
+            <div class="chat-bubble bubble-ai">
+                Hello! I am your <strong>Autonomous AI Agent</strong>.
+                <br><br>
+                You can talk to me in natural English. For example:
+                <ul>
+                    <li><em>"I spent $25 on groceries"</em></li>
+                    <li><em>"What is my total spending so far?"</em></li>
+                    <li><em>"Add a task to complete Leetcode study"</em></li>
+                </ul>
+                I will automatically invoke the tools and record everything directly into your database!
+            </div>
+        </div>
+
+        <!-- QUICK CHIPS -->
+        <div class="drawer-chips">
+            <button class="chip-item" data-text="I spent 15 on coffee">☕ Coffee $15</button>
+            <button class="chip-item" data-text="I spent 80 on grocery shopping">🛒 Grocery $80</button>
+            <button class="chip-item" data-text="What is my total expense breakdown?">📊 Expense Breakdown</button>
+            <button class="chip-item" data-text="Add task: Review system design roadmap">📝 Add Task</button>
+        </div>
+
+        <!-- DRAWER INPUT -->
+        <div class="drawer-input-row">
+            <input type="text" id="drawer-input" placeholder="Type instructions in English..." autocomplete="off">
+            <button id="drawer-send-btn" class="btn-primary drawer-send">Send</button>
+        </div>
+    </aside>
+
+    <!-- SCRIPTS: LENIS (SMOOTH SCROLL) + GSAP (ANIMATIONS) + APP LOGIC -->
+    <script src="https://unpkg.com/@studio-freight/lenis@1.0.42/dist/lenis.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
