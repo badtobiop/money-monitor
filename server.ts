@@ -25,7 +25,32 @@ function getLocalIpAddress(): string {
 
 // Database aur Tools
 import db from './db.js';
-import { toolsDeclaration, executeTool, getDashboardData, getStatisticsData, addExpense } from './agentTools.js';
+import { toolsDeclaration, executeTool, getDashboardData, getStatisticsData, addExpense, addLentRecord, toggleLentStatus, getLentRecords, deleteLentRecord } from './agentTools.js';
+
+// Auto-ensure lent_records table exists
+(async () => {
+    try {
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS lent_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                person_name TEXT NOT NULL,
+                amount REAL NOT NULL,
+                interest_type TEXT DEFAULT 'none',
+                interest_rate REAL DEFAULT 0,
+                interest_amount REAL DEFAULT 0,
+                total_due REAL NOT NULL,
+                status TEXT DEFAULT 'pending',
+                date_lent TEXT NOT NULL,
+                date_returned TEXT,
+                notes TEXT,
+                created_at TEXT NOT NULL
+            );
+        `);
+    } catch (e) {
+        console.error('Table lent_records ensure error:', e);
+    }
+})();
 
 dotenv.config();
 
@@ -663,6 +688,70 @@ app.delete('/api/expenses/:id', async (req: Request, res: Response) => {
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete expense' });
+    }
+});
+
+// ==================== UDHAR / LENT MONEY API ====================
+
+// 1. Get user's lent records and stats
+app.get('/api/lent/:userId', async (req: Request, res: Response) => {
+    try {
+        const userId = String(req.params.userId || 'default_user');
+        const data = await getLentRecords(userId);
+        res.json({ success: true, ...data });
+    } catch (error: any) {
+        console.error('Fetch Lent Records Error:', error);
+        res.status(500).json({ error: 'Failed to fetch lent records' });
+    }
+});
+
+// 2. Add a new lent record
+app.post('/api/lent', async (req: Request, res: Response) => {
+    try {
+        const { userId, personName, amount, interestType = 'none', interestRate = 0, notes = '', dateLent } = req.body;
+        if (!userId || !personName || amount === undefined || amount === null) {
+            res.status(400).json({ error: 'User ID, person name, and amount are required' });
+            return;
+        }
+        const result = await addLentRecord(
+            String(userId),
+            String(personName).trim(),
+            Number(amount),
+            String(interestType),
+            Number(interestRate),
+            String(notes || '').trim(),
+            dateLent ? String(dateLent) : undefined
+        );
+        res.json(result);
+    } catch (error: any) {
+        console.error('Add Lent Record Error:', error);
+        res.status(500).json({ error: error?.message || 'Failed to add lent record' });
+    }
+});
+
+// 3. Toggle return status (Mark returned / return tick)
+app.post('/api/lent/:id/toggle', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { userId } = req.body;
+        const result = await toggleLentStatus(Number(id), userId ? String(userId) : undefined);
+        res.json(result);
+    } catch (error: any) {
+        console.error('Toggle Lent Status Error:', error);
+        res.status(500).json({ error: error?.message || 'Failed to toggle lent status' });
+    }
+});
+
+// 4. Delete lent record
+app.delete('/api/lent/:id', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const userId = req.query.userId ? String(req.query.userId) : undefined;
+        await deleteLentRecord(Number(id), userId);
+        res.json({ success: true });
+    } catch (error: any) {
+        console.error('Delete Lent Record Error:', error);
+        res.status(500).json({ error: 'Failed to delete lent record' });
     }
 });
 

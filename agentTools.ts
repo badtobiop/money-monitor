@@ -19,6 +19,25 @@ export interface Task {
     date: string;
 }
 
+export interface LentRecord {
+    id: number;
+    user_id: string;
+    person_name: string;
+    amount: number;
+    interest_type: string;
+    interest_rate: number;
+    interest_amount: number;
+    total_due: number;
+    status: 'pending' | 'returned';
+    date_lent: string;
+    date_returned: string | null;
+    notes: string | null;
+    created_at: string;
+    days_elapsed?: number;
+    daily_interest?: number;
+    rate_label?: string;
+}
+
 // 1. Add Expense
 export async function addExpense(userId: string, title: string, amount: number, category: string = 'General'): Promise<string> {
     const date = new Date().toISOString().split('T')[0]!; // YYYY-MM-DD
@@ -70,14 +89,257 @@ export async function setMonthlySalary(userId: string, salary: number): Promise<
     }
 }
 
-// 5. Dashboard Data (Live Overview + Monthly Waste & Leakage Analysis + Salary)
+// Helper: Calculate days elapsed and interest accrual
+export function calculateLoanDaysAndInterest(
+    amount: number,
+    interestType: string,
+    interestRate: number,
+    dateLent: string,
+    dateReturned: string | null = null,
+    status: string = 'pending'
+) {
+    const numAmount = Number(amount) || 0;
+    const numRate = Number(interestRate) || 0;
+
+    const startDateStr = (dateLent ? dateLent.split('T')[0] : new Date().toISOString().split('T')[0])!;
+    const startDate = new Date(`${startDateStr}T00:00:00`);
+
+    const endDateStr = (status === 'returned' && dateReturned)
+        ? dateReturned.split('T')[0]!
+        : new Date().toISOString().split('T')[0]!;
+    const endDate = new Date(`${endDateStr}T00:00:00`);
+
+    const diffMs = Math.max(0, endDate.getTime() - startDate.getTime());
+    const daysElapsed = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    let dailyInterest = 0;
+    let accruedInterest = 0;
+    let rateLabel = '0% (Zero Interest)';
+
+    if (interestType === 'daily_percent') {
+        dailyInterest = Math.round((numAmount * (numRate / 100)) * 100) / 100;
+        accruedInterest = Math.round((dailyInterest * daysElapsed) * 100) / 100;
+        rateLabel = `${numRate}% / day ($${dailyInterest.toFixed(2)}/day)`;
+    } else if (interestType === 'monthly_percent' || interestType === 'percent') {
+        dailyInterest = Math.round((numAmount * (numRate / 100) / 30) * 100) / 100;
+        accruedInterest = Math.round((dailyInterest * daysElapsed) * 100) / 100;
+        rateLabel = `${numRate}% / month ($${dailyInterest.toFixed(2)}/day)`;
+    } else if (interestType === 'daily_flat') {
+        dailyInterest = numRate;
+        accruedInterest = Math.round((numRate * daysElapsed) * 100) / 100;
+        rateLabel = `$${numRate} / day`;
+    } else if (interestType === 'flat') {
+        dailyInterest = 0;
+        accruedInterest = numRate;
+        rateLabel = `$${numRate} (One-time fixed)`;
+    } else {
+        dailyInterest = 0;
+        accruedInterest = 0;
+        rateLabel = '0% (Zero Interest)';
+    }
+
+    const totalDue = Math.round((numAmount + accruedInterest) * 100) / 100;
+
+    return {
+        daysElapsed,
+        dailyInterest,
+        accruedInterest,
+        totalDue,
+        rateLabel
+    };
+}
+
+// 7. Add Lent Record (Udhar Diya)
+export async function addLentRecord(
+    userId: string,
+    personName: string,
+    amount: number,
+    interestType: string = 'none',
+    interestRate: number = 0,
+    notes: string = '',
+    customDateLent?: string
+): Promise<{ success: boolean; message: string; record?: any }> {
+    const numAmount = Number(amount) || 0;
+    const numRate = Number(interestRate) || 0;
+    const dateLent = customDateLent && customDateLent.trim()
+        ? customDateLent.trim().split('T')[0]!
+        : new Date().toISOString().split('T')[0]!;
+
+    const calc = calculateLoanDaysAndInterest(numAmount, interestType, numRate, dateLent, null, 'pending');
+    const createdAt = new Date().toISOString();
+
+    const stmt = db.prepare(`
+        INSERT INTO lent_records (user_id, person_name, amount, interest_type, interest_rate, interest_amount, total_due, status, date_lent, notes, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+    `);
+    const info = await stmt.run(userId, personName.trim(), numAmount, interestType, numRate, calc.accruedInterest, calc.totalDue, dateLent, notes.trim(), createdAt);
+
+    const interestInfo = calc.accruedInterest > 0
+        ? ` with accrued interest of $${calc.accruedInterest} (${calc.rateLabel}, Total repayment: $${calc.totalDue})`
+        : (calc.dailyInterest > 0 ? ` with daily accrual of $${calc.dailyInterest}/day (Total repayment: $${calc.totalDue})` : '');
+
+    return {
+        success: true,
+        message: `Success: Recorded loan of $${numAmount} to "${personName}"${interestInfo}.`,
+        record: {
+            id: info.lastInsertRowid,
+            user_id: userId,
+            person_name: personName.trim(),
+            amount: numAmount,
+            interest_type: interestType,
+            interest_rate: numRate,
+            interest_amount: calc.accruedInterest,
+            total_due: calc.totalDue,
+            daily_interest: calc.dailyInterest,
+            days_elapsed: calc.daysElapsed,
+            rate_label: calc.rateLabel,
+            status: 'pending',
+            date_lent: dateLent,
+            notes: notes.trim()
+        }
+    };
+}
+
+// 8. Toggle Lent Status (Mark as Returned or Pending)
+export async function toggleLentStatus(lentId: number, userId?: string) {
+    let query = 'SELECT * FROM lent_records WHERE id = ?';
+    const args: any[] = [lentId];
+    if (userId) {
+        query += ' AND user_id = ?';
+        args.push(userId);
+    }
+    const record = await db.prepare(query).get(...args) as LentRecord | undefined;
+    if (!record) {
+        throw new Error('Lent record not found');
+    }
+
+    const newStatus = record.status === 'pending' ? 'returned' : 'pending';
+    const dateReturned = newStatus === 'returned' ? new Date().toISOString().split('T')[0]! : null;
+
+    let finalInterestAmount = record.interest_amount;
+    let finalTotalDue = record.total_due;
+
+    if (newStatus === 'returned') {
+        const calc = calculateLoanDaysAndInterest(record.amount, record.interest_type, record.interest_rate, record.date_lent, dateReturned, 'returned');
+        finalInterestAmount = calc.accruedInterest;
+        finalTotalDue = calc.totalDue;
+    }
+
+    await db.prepare('UPDATE lent_records SET status = ?, date_returned = ?, interest_amount = ?, total_due = ? WHERE id = ?')
+        .run(newStatus, dateReturned, finalInterestAmount, finalTotalDue, lentId);
+
+    return {
+        success: true,
+        newStatus,
+        dateReturned,
+        record: {
+            ...record,
+            status: newStatus,
+            date_returned: dateReturned,
+            interest_amount: finalInterestAmount,
+            total_due: finalTotalDue
+        }
+    };
+}
+
+// 9. Get Lent Records & Stats
+export async function getLentRecords(userId: string) {
+    const rawRecords = await db.prepare('SELECT * FROM lent_records WHERE user_id = ? ORDER BY id DESC').all(userId) as LentRecord[];
+
+    let totalLentGiven = 0;
+    let pendingPrincipal = 0;
+    let pendingTotalDue = 0;
+    let returnedTotal = 0;
+    let interestEarned = 0;
+
+    const enrichedRecords = (rawRecords || []).map(r => {
+        totalLentGiven += Number(r.amount) || 0;
+
+        if (r.status === 'returned') {
+            const calc = calculateLoanDaysAndInterest(r.amount, r.interest_type, r.interest_rate, r.date_lent, r.date_returned, 'returned');
+            returnedTotal += Number(r.total_due) || 0;
+            interestEarned += Number(r.interest_amount) || 0;
+            return {
+                ...r,
+                days_elapsed: calc.daysElapsed,
+                daily_interest: calc.dailyInterest,
+                rate_label: calc.rateLabel
+            };
+        } else {
+            const calc = calculateLoanDaysAndInterest(r.amount, r.interest_type, r.interest_rate, r.date_lent, null, 'pending');
+            pendingPrincipal += Number(r.amount) || 0;
+            pendingTotalDue += calc.totalDue;
+            return {
+                ...r,
+                days_elapsed: calc.daysElapsed,
+                daily_interest: calc.dailyInterest,
+                interest_amount: calc.accruedInterest,
+                total_due: calc.totalDue,
+                rate_label: calc.rateLabel
+            };
+        }
+    });
+
+    return {
+        records: enrichedRecords,
+        stats: {
+            totalLentGiven: Math.round(totalLentGiven * 100) / 100,
+            pendingPrincipal: Math.round(pendingPrincipal * 100) / 100,
+            pendingTotalDue: Math.round(pendingTotalDue * 100) / 100,
+            returnedTotal: Math.round(returnedTotal * 100) / 100,
+            interestEarned: Math.round(interestEarned * 100) / 100
+        }
+    };
+}
+
+// 10. Delete Lent Record
+export async function deleteLentRecord(lentId: number, userId?: string) {
+    if (userId) {
+        await db.prepare('DELETE FROM lent_records WHERE id = ? AND user_id = ?').run(lentId, userId);
+    } else {
+        await db.prepare('DELETE FROM lent_records WHERE id = ?').run(lentId);
+    }
+    return { success: true };
+}
+
+// 11. Settle Lent by Person Name (for AI Agent)
+export async function settleMoneyLentByPerson(userId: string, personName: string): Promise<string> {
+    const record = await db.prepare("SELECT * FROM lent_records WHERE user_id = ? AND LOWER(person_name) LIKE ? AND status = 'pending' ORDER BY id DESC LIMIT 1").get(userId, `%${personName.toLowerCase().trim()}%`) as LentRecord | undefined;
+    if (!record) {
+        return `No pending lent record found for "${personName}".`;
+    }
+    const res = await toggleLentStatus(record.id, userId);
+    const updated = res.record;
+    return `Success: Marked loan of $${record.amount} (Accrued Interest: $${updated.interest_amount}, Total repayment: $${updated.total_due}) from "${record.person_name}" as repaid. Capital and interest have been credited back to your balance.`;
+}
+
+// 12. Get Lent Summary for AI Agent
+export async function getLentSummary(userId: string): Promise<string> {
+    const { records, stats } = await getLentRecords(userId);
+    if (!records || records.length === 0) {
+        return 'No loan records found in portfolio.';
+    }
+    const pendingList = records.filter(r => r.status === 'pending');
+
+    let summary = `Total Capital Lent: $${stats.totalLentGiven} | Active Pending Repayments: $${stats.pendingTotalDue} | Settled: $${stats.returnedTotal} (Interest Profit: $${stats.interestEarned})\n\n`;
+    if (pendingList.length > 0) {
+        summary += 'Active Pending Loans:\n' + pendingList.map(r =>
+            `- ${r.person_name}: Principal $${r.amount} | Days Active: ${r.days_elapsed} days | Accrued Interest: $${r.interest_amount} | Total Repayment Due: $${r.total_due}`
+        ).join('\n');
+    } else {
+        summary += 'All issued loans have been settled! No pending repayments.';
+    }
+    return summary;
+}
+
+// 5. Dashboard Data (Live Overview + Monthly Waste & Leakage Analysis + Salary + Lent Sync)
 export async function getDashboardData(userId: string) {
     // 30 days window for current month analytics
     const now = new Date();
     const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]!;
 
-    // FAST PARALLEL QUERIES: Run all 5 database queries concurrently in single roundtrip
-    const [totalRow, expensesList, userRow, monthTotalRow, catRows] = await Promise.all([
+    // FAST PARALLEL QUERIES: Run all database queries concurrently in single roundtrip
+    const [totalRow, expensesList, userRow, monthTotalRow, catRows, lentStatsRow] = await Promise.all([
         db.prepare('SELECT SUM(amount) as total FROM expenses WHERE user_id = ?').get(userId) as Promise<{ total: number | null }>,
         db.prepare('SELECT * FROM expenses WHERE user_id = ? ORDER BY id DESC LIMIT 10').all(userId) as Promise<Expense[]>,
         db.prepare('SELECT monthly_salary FROM users WHERE id = ? OR email = ?').get(userId, userId).catch(() => null) as Promise<{ monthly_salary: number | null } | undefined>,
@@ -88,7 +350,14 @@ export async function getDashboardData(userId: string) {
             WHERE user_id = ? AND date >= ?
             GROUP BY category 
             ORDER BY total DESC
-        `).all(userId, monthAgo).catch(() => []) as Promise<{ category: string; total: number; count: number }[]>
+        `).all(userId, monthAgo).catch(() => []) as Promise<{ category: string; total: number; count: number }[]>,
+        db.prepare(`
+            SELECT 
+                COALESCE(SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END), 0) as pending_lent,
+                COALESCE(SUM(CASE WHEN status = 'returned' THEN interest_amount ELSE 0 END), 0) as returned_interest
+            FROM lent_records
+            WHERE user_id = ?
+        `).get(userId).catch(() => ({ pending_lent: 0, returned_interest: 0 })) as Promise<{ pending_lent: number; returned_interest: number }>
     ]);
 
     let monthlySalary = 0;
@@ -97,7 +366,13 @@ export async function getDashboardData(userId: string) {
     }
 
     const monthTotal = monthTotalRow?.total || 0;
-    const remainingBalance = monthlySalary > 0 ? monthlySalary - monthTotal : 0;
+    const pendingLent = Number(lentStatsRow?.pending_lent) || 0;
+    const returnedInterest = Number(lentStatsRow?.returned_interest) || 0;
+
+    // Remaining Balance = Monthly Salary - Monthly Expenses - Pending Lent (out of pocket) + Recovered Vyaj
+    const remainingBalance = monthlySalary > 0 
+        ? Math.max(0, monthlySalary - monthTotal - pendingLent + returnedInterest) 
+        : 0;
     const savingsRate = monthlySalary > 0 ? Math.max(0, Math.round((remainingBalance / monthlySalary) * 100)) : 0;
 
     const categoriesWithPct = catRows.map(c => ({
@@ -154,6 +429,8 @@ export async function getDashboardData(userId: string) {
         monthlySalary,
         remainingBalance,
         savingsRate,
+        pendingLent,
+        returnedInterest,
         expenses: expensesList,
         analytics: {
             topCategory,
@@ -273,6 +550,38 @@ export const toolsDeclaration = [
                 name: 'getPendingTasks',
                 description: 'Get all pending tasks from the to-do list',
                 parameters: { type: Type.OBJECT, properties: {} }
+            },
+            {
+                name: 'recordMoneyLent',
+                description: 'Record capital lent to an individual or contact, with optional daily or monthly interest accrual models',
+                parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                        person_name: { type: Type.STRING, description: 'Name of the contact or friend who received the loan' },
+                        amount: { type: Type.NUMBER, description: 'Initial principal amount of money borrowed' },
+                        interest_type: { type: Type.STRING, description: '"none" (0%), "daily_percent" (% per day), "monthly_percent" (% per month pro-rata), "daily_flat" (fixed amount/day), or "flat" (one-off fee)' },
+                        interest_rate: { type: Type.NUMBER, description: 'Interest rate value (e.g. 1 for 1% daily, 2 for 2% monthly, or 50 for flat amount)' },
+                        notes: { type: Type.STRING, description: 'Optional purpose or reference note' },
+                        date_lent: { type: Type.STRING, description: 'Optional date the money was lent in YYYY-MM-DD format (defaults to today)' }
+                    },
+                    required: ['person_name', 'amount']
+                }
+            },
+            {
+                name: 'settleMoneyLent',
+                description: 'Mark an issued loan as repaid when a borrower returns the money',
+                parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                        person_name: { type: Type.STRING, description: 'Name of the borrower who returned the funds' }
+                    },
+                    required: ['person_name']
+                }
+            },
+            {
+                name: 'getLentSummary',
+                description: 'Get summary of all money lent, active pending repayments with daily accrued interest, and settled returns',
+                parameters: { type: Type.OBJECT, properties: {} }
             }
         ]
     }
@@ -290,6 +599,21 @@ export async function executeTool(name: string, args: any, currentUserId: string
         return await addTask(currentUserId, args.title);
     } else if (name === 'getPendingTasks') {
         return await getPendingTasks(currentUserId);
+    } else if (name === 'recordMoneyLent') {
+        const res = await addLentRecord(
+            currentUserId,
+            args.person_name,
+            Number(args.amount),
+            args.interest_type || 'none',
+            Number(args.interest_rate || 0),
+            args.notes || '',
+            args.date_lent
+        );
+        return res.message;
+    } else if (name === 'settleMoneyLent') {
+        return await settleMoneyLentByPerson(currentUserId, args.person_name);
+    } else if (name === 'getLentSummary') {
+        return await getLentSummary(currentUserId);
     }
     return `Error: Tool ${name} not found.`;
 }

@@ -2944,3 +2944,375 @@ body {
         padding: 20px 14px !important;
     }
 }
+
+/* ==========================================================================
+   UDHAR / MONEY LENT TRACKER STYLING
+   ========================================================================== */
+
+.lent-add-card {
+    margin-bottom: 24px;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(225, 29, 72, 0.22);
+    box-shadow: 0 12px 36px -8px rgba(225, 29, 72, 0.08);
+}
+
+.lent-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.form-row-2col {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+
+.form-row-3col {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+@media (max-width: 860px) {
+    .form-row-2col,
+    .form-row-3col {
+        grid-template-columns: 1fr;
+    }
+}
+
+.lent-calc-preview {
+    background: linear-gradient(135deg, rgba(255, 241, 242, 0.95), rgba(240, 253, 244, 0.95));
+    border: 1.5px dashed rgba(225, 29, 72, 0.35);
+    border-radius: var(--radius-md);
+    padding: 14px 18px;
+    color: var(--text-main);
+}
+
+.calc-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 14px;
+    align-items: center;
+}
+
+.calc-preview-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.calc-item-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-muted);
+}
+
+.calc-item-val {
+    font-size: 0.96rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.calc-preview-highlight {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 10px;
+    padding: 8px 14px;
+}
+
+.calc-preview-highlight .calc-item-val {
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+
+.calc-preview-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    justify-content: space-between;
+}
+
+.calc-preview-row span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.days-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+    margin-top: 3px;
+    width: fit-content;
+}
+
+.days-badge-pending {
+    background: #fff1f2;
+    color: #e11d48;
+    border: 1px solid rgba(225, 29, 72, 0.25);
+}
+
+.days-badge-returned {
+    background: #ecfdf5;
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.daily-rate-tag {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: #b45309;
+    background: #fffbeb;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    padding: 3px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+}
+
+.lent-form-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+
+.lent-sync-hint {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+    flex: 1;
+    min-width: 240px;
+}
+
+.lent-list-card {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(225, 29, 72, 0.18);
+}
+
+.lent-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.lent-filter-tabs {
+    display: inline-flex;
+    background: rgba(254, 205, 211, 0.35);
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    gap: 4px;
+}
+
+.lent-filter-btn {
+    border: none;
+    background: transparent;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lent-filter-btn:hover {
+    color: var(--text-main);
+}
+
+.lent-filter-btn.active {
+    background: #ffffff;
+    color: #e11d48;
+    box-shadow: 0 2px 8px rgba(225, 29, 72, 0.15);
+}
+
+.lent-interest-badge {
+    display: inline-block;
+    background: #fff1f2;
+    color: #e11d48;
+    border: 1px solid rgba(225, 29, 72, 0.25);
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.lent-no-interest {
+    color: var(--text-subtle);
+    font-size: 0.78rem;
+    font-style: italic;
+}
+
+.tag-pending {
+    background: #fffbeb !important;
+    color: #b45309 !important;
+    border: 1px solid #fde68a !important;
+}
+
+.tag-returned {
+    background: #ecfdf5 !important;
+    color: #047857 !important;
+    border: 1px solid #a7f3d0 !important;
+}
+
+/* ==================== MODERN LENT SETTLEMENT BUTTONS & CONTROLS ==================== */
+
+.lent-settle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 15px;
+    border-radius: 24px;
+    font-size: 0.79rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+    white-space: nowrap;
+    outline: none;
+    letter-spacing: 0.2px;
+}
+
+.lent-settle-btn .btn-check-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    font-size: 0.85rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+/* Pending State: Elegant Actionable Pill */
+.lent-settle-btn.btn-settle-pending {
+    background: #ffffff;
+    color: #e11d48;
+    border: 1.5px solid rgba(225, 29, 72, 0.45);
+    box-shadow: 0 2px 8px rgba(225, 29, 72, 0.1);
+}
+
+.lent-settle-btn.btn-settle-pending:hover {
+    background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+    color: #ffffff;
+    border-color: #e11d48;
+    transform: translateY(-1.5px);
+    box-shadow: 0 5px 16px rgba(225, 29, 72, 0.35);
+}
+
+.lent-settle-btn.btn-settle-pending:active {
+    transform: translateY(0);
+}
+
+/* Done / Settled State: Crisp Emerald Pill */
+.lent-settle-btn.btn-settle-done {
+    background: #ecfdf5;
+    color: #047857;
+    border: 1.5px solid rgba(16, 185, 129, 0.5);
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.08);
+}
+
+.lent-settle-btn.btn-settle-done:hover {
+    background: #d1fae5;
+    color: #065f46;
+    border-color: #059669;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(16, 185, 129, 0.2);
+}
+
+/* Delete Icon Action Button */
+.del-btn-icon,
+.lent-del-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid rgba(225, 29, 72, 0.25);
+    background: #ffffff;
+    color: #94a3b8;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.92rem;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    outline: none;
+}
+
+.del-btn-icon:hover,
+.lent-del-btn:hover {
+    background: #fff1f2;
+    border-color: #f43f5e;
+    color: #e11d48;
+    transform: scale(1.08);
+    box-shadow: 0 3px 10px rgba(225, 29, 72, 0.2);
+}
+
+/* Row states */
+.row-returned {
+    background: rgba(240, 253, 244, 0.4) !important;
+}
+
+.row-returned td {
+    color: #475569;
+}
+
+.row-pending {
+    background: rgba(255, 255, 255, 0.6) !important;
+}
+
+.lent-table th {
+    white-space: nowrap;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.lent-table td {
+    vertical-align: middle;
+    padding: 13px 16px;
+}
+
+@media (max-width: 768px) {
+    .calc-preview-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .lent-list-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .lent-filter-tabs {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .lent-filter-btn {
+        flex: 1;
+        text-align: center;
+        padding: 7px 6px;
+        font-size: 0.74rem;
+    }
+
+    .lent-settle-btn {
+        padding: 5px 10px;
+        font-size: 0.72rem;
+    }
+}

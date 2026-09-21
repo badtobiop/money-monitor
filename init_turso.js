@@ -3,8 +3,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const client = createClient({
-  url: process.env.TURSO_DATABASE_URL!,
-  authToken: process.env.TURSO_AUTH_TOKEN!
+  url: process.env.TURSO_DATABASE_URL || '',
+  authToken: process.env.TURSO_AUTH_TOKEN || ''
 });
 
 async function main() {
@@ -69,7 +69,25 @@ async function main() {
     );
   `);
 
-  console.log('✅ All 5 tables created in Turso Cloud SQLite successfully!');
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS lent_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      person_name TEXT NOT NULL,
+      amount REAL NOT NULL,
+      interest_type TEXT DEFAULT 'none',
+      interest_rate REAL DEFAULT 0,
+      interest_amount REAL DEFAULT 0,
+      total_due REAL NOT NULL,
+      status TEXT DEFAULT 'pending',
+      date_lent TEXT NOT NULL,
+      date_returned TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL
+    );
+  `);
+
+  console.log('✅ All 6 tables created in Turso Cloud SQLite successfully!');
 
   const tables = await client.execute("SELECT name FROM sqlite_master WHERE type='table'");
   console.log('Tables in Turso:', tables.rows.map(r => r.name));

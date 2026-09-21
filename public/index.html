@@ -154,6 +154,10 @@
                     <div class="nav-icon-circle">📈</div>
                     <span class="nav-label">Statistics</span>
                 </button>
+                <button class="nav-item" data-view="view-udhar">
+                    <div class="nav-icon-circle">🤝</div>
+                    <span class="nav-label">Money Lent</span>
+                </button>
                 <button class="nav-item" data-view="view-settings">
                     <div class="nav-icon-circle">⚙️</div>
                     <span class="nav-label">Settings</span>
@@ -448,6 +452,176 @@
                 </div>
             </div>
 
+            <!-- VIEW: MONEY LENT & LOANS PORTFOLIO -->
+            <div class="view-panel" id="view-udhar" style="display: none;">
+                <!-- KPI STATS CARDS -->
+                <div class="kpi-grid">
+                    <!-- KPI 1: Total Capital Lent -->
+                    <div class="kpi-card card-salary">
+                        <div class="kpi-header">
+                            <span>Total Capital Lent</span>
+                            <span class="kpi-tag tag-rose">Portfolio</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-lent-total">₹0</div>
+                        <div class="kpi-note" id="kpi-lent-total-note">Cumulative principal lent out</div>
+                    </div>
+
+                    <!-- KPI 2: Active Unpaid Loans -->
+                    <div class="kpi-card card-spent">
+                        <div class="kpi-header">
+                            <span>Active Loans Pending</span>
+                            <span class="kpi-tag tag-warning" id="kpi-lent-pending-tag">0 Active</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-lent-pending">₹0</div>
+                        <div class="kpi-note" id="kpi-lent-pending-note">Deducted from balance until repaid</div>
+                    </div>
+
+                    <!-- KPI 3: Recovered Capital -->
+                    <div class="kpi-card card-primary">
+                        <div class="kpi-header">
+                            <span>Recovered Capital</span>
+                            <span class="kpi-tag tag-emerald" id="kpi-lent-returned-tag">0 Settled</span>
+                        </div>
+                        <div class="kpi-value text-emerald" id="kpi-lent-recovered">₹0</div>
+                        <div class="kpi-note">Principal + interest credited back to balance</div>
+                    </div>
+
+                    <!-- KPI 4: Accrued Interest Profit -->
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span>Interest Earned</span>
+                            <span class="kpi-tag tag-emerald">Profit 📈</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-lent-interest">₹0</div>
+                        <div class="kpi-note">Total interest accrued on settled loans</div>
+                    </div>
+                </div>
+
+                <!-- ADD NEW LENT RECORD CARD -->
+                <div class="glass-card add-card lent-add-card">
+                    <div class="card-heading">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.4rem;">🤝</span>
+                            <div>
+                                <h3>Record Issued Loan</h3>
+                                <span class="card-caption">Log money lent to contacts, apply daily or monthly interest accrual, and automate balance reconciliation.</span>
+                            </div>
+                        </div>
+                        <span class="badge badge-rose">⚡ Real-Time Daily Accrual</span>
+                    </div>
+
+                    <form id="lent-form" class="lent-form">
+                        <div class="form-row-3col">
+                            <div class="input-group">
+                                <label for="lent-person-name">Borrower / Contact Name *</label>
+                                <input type="text" id="lent-person-name" placeholder="Contact name (e.g. Robert Smith, Alex)" required autocomplete="off">
+                            </div>
+                            <div class="input-group">
+                                <label for="lent-amount">Principal Borrowed *</label>
+                                <input type="number" id="lent-amount" placeholder="Principal amount (e.g. 10000)" min="1" step="0.01" required>
+                            </div>
+                            <div class="input-group">
+                                <label for="lent-date-lent">Date Issued *</label>
+                                <input type="date" id="lent-date-lent" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row-2col">
+                            <div class="input-group">
+                                <label for="lent-interest-type">Interest Accrual Model</label>
+                                <select id="lent-interest-type">
+                                    <option value="none" selected>Zero Interest (0%)</option>
+                                    <option value="daily_percent">Daily Percentage (% per day)</option>
+                                    <option value="monthly_percent">Monthly Percentage (% per month - Daily Pro-Rata)</option>
+                                    <option value="daily_flat">Daily Flat Fee (₹ per day)</option>
+                                    <option value="flat">One-Time Fixed Fee (₹)</option>
+                                </select>
+                            </div>
+                            <div class="input-group" id="lent-interest-val-group" style="display: none;">
+                                <label for="lent-interest-val" id="lent-interest-val-label">Interest Rate / Value</label>
+                                <input type="number" id="lent-interest-val" placeholder="e.g. 1 for 1%/day or 2 for 2%/mo" min="0" step="any" value="0">
+                            </div>
+                        </div>
+
+                        <!-- Live Calculation Preview Box -->
+                        <div class="lent-calc-preview" id="lent-calc-preview">
+                            <div class="calc-preview-grid">
+                                <div class="calc-preview-item">
+                                    <span class="calc-item-label">Principal Borrowed</span>
+                                    <strong id="preview-principal" class="calc-item-val">₹0</strong>
+                                </div>
+                                <div class="calc-preview-item">
+                                    <span class="calc-item-label">Active Days Elapsed</span>
+                                    <span class="days-badge" id="preview-days">0 Days</span>
+                                </div>
+                                <div class="calc-preview-item">
+                                    <span class="calc-item-label">Daily Accrual Rate</span>
+                                    <strong id="preview-daily-rate" class="calc-item-val text-muted">₹0.00 / day</strong>
+                                </div>
+                                <div class="calc-preview-item">
+                                    <span class="calc-item-label">Accrued Interest</span>
+                                    <strong id="preview-interest" class="calc-item-val text-rose">+₹0.00</strong>
+                                </div>
+                                <div class="calc-preview-item calc-preview-highlight">
+                                    <span class="calc-item-label">Total Repayment Due</span>
+                                    <strong id="preview-total" class="calc-item-val text-emerald">₹0.00</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="lent-notes">Purpose / Reference Notes (Optional)</label>
+                            <input type="text" id="lent-notes" placeholder="e.g. Short-term business bridge loan, equipment purchase" autocomplete="off">
+                        </div>
+
+                        <div class="lent-form-actions">
+                            <button type="submit" class="btn-primary" id="lent-submit-btn">
+                                <span>➕</span> Record Loan & Deduct from Balance
+                            </button>
+                            <span class="lent-sync-hint">💡 Interest accrues automatically every day. When repaid, click <strong>"Mark as Repaid"</strong> in the ledger below to freeze interest and credit all funds back to your balance.</span>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- LENT RECORDS PORTFOLIO LEDGER -->
+                <div class="glass-card lent-list-card">
+                    <div class="lent-list-header">
+                        <div>
+                            <h3>📋 Loan Portfolio Ledger</h3>
+                            <span class="card-caption">All issued capital records, daily accrual rates, and repayment settlement statuses</span>
+                        </div>
+                        <div class="lent-filter-tabs">
+                            <button type="button" class="lent-filter-btn active" data-filter="all">All (<span id="count-all">0</span>)</button>
+                            <button type="button" class="lent-filter-btn" data-filter="pending">⏳ Pending (<span id="count-pending">0</span>)</button>
+                            <button type="button" class="lent-filter-btn" data-filter="returned">✅ Settled (<span id="count-returned">0</span>)</button>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table lent-table">
+                            <thead>
+                                <tr>
+                                    <th>Borrower</th>
+                                    <th>Principal Borrowed</th>
+                                    <th>Date Issued & Days</th>
+                                    <th>Daily Accrual Rate</th>
+                                    <th>Accrued Interest</th>
+                                    <th>Total Repayment Due</th>
+                                    <th>Status</th>
+                                    <th>Settlement</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lent-tbody">
+                                <tr>
+                                    <td colspan="9" class="empty-cell">No loan records logged yet. Use the form above to record capital lent.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- VIEW 3: SETTINGS -->
             <div class="view-panel" id="view-settings" style="display: none;">
                 <div class="glass-card settings-box">
@@ -629,6 +803,10 @@
                 <div class="nav-icon-circle">📈</div>
                 <span class="nav-label">Stats</span>
             </button>
+            <button class="nav-item" data-view="view-udhar">
+                <div class="nav-icon-circle">🤝</div>
+                <span class="nav-label">Lent</span>
+            </button>
             <button class="nav-item" data-view="view-settings">
                 <div class="nav-icon-circle">⚙️</div>
                 <span class="nav-label">Settings</span>
@@ -680,6 +858,9 @@
         <div class="drawer-chips">
             <button class="chip-item" data-text="I spent 15 on coffee">☕ Coffee $15</button>
             <button class="chip-item" data-text="I spent 80 on grocery shopping">🛒 Grocery $80</button>
+            <button class="chip-item" data-text="I lent 200 to Robert with 5% interest">🤝 Lent $200 (5% interest)</button>
+            <button class="chip-item" data-text="Robert has repaid the loan">✅ Robert repaid loan</button>
+            <button class="chip-item" data-text="Show my money lent summary">📊 Lent Summary</button>
             <button class="chip-item" data-text="What is my total expense breakdown?">📊 Expense Breakdown</button>
             <button class="chip-item" data-text="Add task: Review system design roadmap">📝 Add Task</button>
         </div>

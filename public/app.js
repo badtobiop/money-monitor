@@ -730,6 +730,7 @@ const pageSubheading = document.getElementById('page-subheading');
 const viewMeta = {
     'view-dashboard': { title: 'Dashboard', subtitle: 'Personal overview and financial insights' },
     'view-statistics': { title: 'Statistics & Analytics', subtitle: 'Circular spending ratios across Week, Month, and Year' },
+    'view-udhar': { title: 'Money Lent Ledger', subtitle: 'Manage issued capital, configure custom interest models, and reconcile repayments' },
     'view-settings': { title: 'Settings', subtitle: 'Account preferences and SQLite database configuration' },
     'view-help': { title: 'Help Center & Support', subtitle: 'Submit tickets directly to our admin desk — real-time Gmail dispatch' }
 };
@@ -770,6 +771,11 @@ document.querySelectorAll('.nav-item').forEach(item => {
             loadStatistics();
         }
 
+        // If switching to udhar, load lent records
+        if (targetView === 'view-udhar') {
+            loadLentData();
+        }
+
         // If switching to help, reload tickets
         if (targetView === 'view-help') {
             loadUserTickets();
@@ -792,7 +798,7 @@ async function loadDashboard() {
         // 1. Update KPI Cards & Salary Metrics
         const monthlySalary = Number(data.monthlySalary) || 0;
         const monthSpent = Number(data.monthTotal) || 0;
-        const remainingBalance = monthlySalary > 0 ? (monthlySalary - monthSpent) : 0;
+        const remainingBalance = data.remainingBalance !== undefined ? Number(data.remainingBalance) : (monthlySalary > 0 ? (monthlySalary - monthSpent) : 0);
         const savingsRate = monthlySalary > 0 ? Math.max(0, Math.round((remainingBalance / monthlySalary) * 100)) : 0;
 
         // KPI 1: Monthly Salary
@@ -1158,7 +1164,7 @@ async function loadStatistics() {
 // Refresh All Data Helper
 async function refreshAllData() {
     // Parallel fetch: cuts dashboard refresh latency in half!
-    await Promise.all([loadDashboard(), loadStatistics()]);
+    await Promise.all([loadDashboard(), loadStatistics(), loadLentData()]);
     initGsapHoverEffects();
 }
 
@@ -1420,6 +1426,406 @@ if (drawerInput) {
     });
 }
 
+// ==================== 7. UDHAR / MONEY LENT KHATA ====================
+let allLentRecords = [];
+let currentLentFilter = 'all'; // 'all' | 'pending' | 'returned'
+
+const lentForm = document.getElementById('lent-form');
+const lentPersonName = document.getElementById('lent-person-name');
+const lentAmount = document.getElementById('lent-amount');
+const lentDateLent = document.getElementById('lent-date-lent');
+const lentInterestType = document.getElementById('lent-interest-type');
+const lentInterestValGroup = document.getElementById('lent-interest-val-group');
+const lentInterestValLabel = document.getElementById('lent-interest-val-label');
+const lentInterestVal = document.getElementById('lent-interest-val');
+const lentNotes = document.getElementById('lent-notes');
+const lentSubmitBtn = document.getElementById('lent-submit-btn');
+
+const previewPrincipal = document.getElementById('preview-principal');
+const previewDays = document.getElementById('preview-days');
+const previewDailyRate = document.getElementById('preview-daily-rate');
+const previewInterest = document.getElementById('preview-interest');
+const previewTotal = document.getElementById('preview-total');
+const lentTbody = document.getElementById('lent-tbody');
+
+// Initialize date picker to today's date
+if (lentDateLent && !lentDateLent.value) {
+    lentDateLent.value = new Date().toISOString().split('T')[0];
+}
+
+// Client-side Interest & Accrual Calculator
+function calcClientLoanDaysAndInterest(amount, interestType, interestRate, dateLent, dateReturned = null, status = 'pending') {
+    const numAmount = Number(amount) || 0;
+    const numRate = Number(interestRate) || 0;
+
+    const startDateStr = (dateLent ? dateLent.split('T')[0] : new Date().toISOString().split('T')[0]);
+    const startDate = new Date(`${startDateStr}T00:00:00`);
+
+    const endDateStr = (status === 'returned' && dateReturned)
+        ? dateReturned.split('T')[0]
+        : new Date().toISOString().split('T')[0];
+    const endDate = new Date(`${endDateStr}T00:00:00`);
+
+    const diffMs = Math.max(0, endDate.getTime() - startDate.getTime());
+    const daysElapsed = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    let dailyInterest = 0;
+    let accruedInterest = 0;
+    let rateLabel = '0% (Zero Interest)';
+
+    if (interestType === 'daily_percent') {
+        dailyInterest = Math.round((numAmount * (numRate / 100)) * 100) / 100;
+        accruedInterest = Math.round((dailyInterest * daysElapsed) * 100) / 100;
+        rateLabel = `${numRate}% / day (${currentCurrency}${dailyInterest.toFixed(2)}/day)`;
+    } else if (interestType === 'monthly_percent' || interestType === 'percent') {
+        dailyInterest = Math.round((numAmount * (numRate / 100) / 30) * 100) / 100;
+        accruedInterest = Math.round((dailyInterest * daysElapsed) * 100) / 100;
+        rateLabel = `${numRate}% / mo (${currentCurrency}${dailyInterest.toFixed(2)}/day)`;
+    } else if (interestType === 'daily_flat') {
+        dailyInterest = numRate;
+        accruedInterest = Math.round((numRate * daysElapsed) * 100) / 100;
+        rateLabel = `${currentCurrency}${numRate} / day`;
+    } else if (interestType === 'flat') {
+        dailyInterest = 0;
+        accruedInterest = numRate;
+        rateLabel = `${currentCurrency}${numRate} (One-time fixed)`;
+    } else {
+        dailyInterest = 0;
+        accruedInterest = 0;
+        rateLabel = '0% (Zero Interest)';
+    }
+
+    const totalDue = Math.round((numAmount + accruedInterest) * 100) / 100;
+
+    return {
+        daysElapsed,
+        dailyInterest,
+        accruedInterest,
+        totalDue,
+        rateLabel
+    };
+}
+
+// Real-time Preview Calculation
+function updateLentPreview() {
+    if (!previewPrincipal || !previewInterest || !previewTotal) return;
+    const amount = Number(lentAmount?.value) || 0;
+    const type = lentInterestType?.value || 'none';
+    const rate = Number(lentInterestVal?.value) || 0;
+    const dateLent = lentDateLent?.value || new Date().toISOString().split('T')[0];
+
+    const calc = calcClientLoanDaysAndInterest(amount, type, rate, dateLent, null, 'pending');
+
+    previewPrincipal.innerText = `${currentCurrency}${amount.toLocaleString()}`;
+    if (previewDays) {
+        previewDays.innerText = calc.daysElapsed === 0 ? '0 Days (Today)' : `${calc.daysElapsed} Day${calc.daysElapsed === 1 ? '' : 's'}`;
+    }
+    if (previewDailyRate) {
+        previewDailyRate.innerText = calc.dailyInterest > 0 ? `+${currentCurrency}${calc.dailyInterest.toFixed(2)} / day` : '₹0.00 / day';
+    }
+    previewInterest.innerText = `+${currentCurrency}${calc.accruedInterest.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    previewTotal.innerText = `${currentCurrency}${calc.totalDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// Toggle Interest Input Visibility & Labels
+if (lentInterestType) {
+    lentInterestType.addEventListener('change', () => {
+        const val = lentInterestType.value;
+        if (val === 'daily_percent') {
+            lentInterestValGroup.style.display = 'flex';
+            lentInterestValLabel.innerText = 'Daily Rate (% per day)';
+            lentInterestVal.placeholder = 'e.g. 0.5 (for 0.5%/day)';
+        } else if (val === 'monthly_percent') {
+            lentInterestValGroup.style.display = 'flex';
+            lentInterestValLabel.innerText = 'Monthly Rate (% per month - Daily Pro-Rata)';
+            lentInterestVal.placeholder = 'e.g. 2 (for 2%/month)';
+        } else if (val === 'daily_flat') {
+            lentInterestValGroup.style.display = 'flex';
+            lentInterestValLabel.innerText = 'Daily Flat Fee (₹ per day)';
+            lentInterestVal.placeholder = 'e.g. 25 (₹25/day)';
+        } else if (val === 'flat') {
+            lentInterestValGroup.style.display = 'flex';
+            lentInterestValLabel.innerText = 'One-Time Fixed Fee (₹)';
+            lentInterestVal.placeholder = 'e.g. 500 (one-time)';
+        } else {
+            lentInterestValGroup.style.display = 'none';
+            lentInterestVal.value = '0';
+        }
+        updateLentPreview();
+    });
+}
+
+if (lentAmount) lentAmount.addEventListener('input', updateLentPreview);
+if (lentInterestVal) lentInterestVal.addEventListener('input', updateLentPreview);
+if (lentDateLent) lentDateLent.addEventListener('input', updateLentPreview);
+
+// Load Lent Records and Stats
+async function loadLentData() {
+    if (!currentUser) return;
+    const userId = String(currentUser.id || currentUser.email);
+
+    try {
+        const res = await fetch(`${API_BASE}/api/lent/${encodeURIComponent(userId)}`);
+        const data = await res.json();
+        if (!data.success) return;
+
+        allLentRecords = data.records || [];
+        const stats = data.stats || {};
+
+        // Update KPI Cards
+        const totalGivenEl = document.getElementById('kpi-lent-total');
+        const pendingEl = document.getElementById('kpi-lent-pending');
+        const recoveredEl = document.getElementById('kpi-lent-recovered');
+        const interestEl = document.getElementById('kpi-lent-interest');
+        const pendingTag = document.getElementById('kpi-lent-pending-tag');
+        const returnedTag = document.getElementById('kpi-lent-returned-tag');
+
+        const pendingCount = allLentRecords.filter(r => r.status === 'pending').length;
+        const returnedCount = allLentRecords.filter(r => r.status === 'returned').length;
+
+        if (totalGivenEl) totalGivenEl.innerText = `${currentCurrency}${(stats.totalLentGiven || 0).toLocaleString()}`;
+        if (pendingEl) pendingEl.innerText = `${currentCurrency}${(stats.pendingTotalDue || stats.pendingPrincipal || 0).toLocaleString()}`;
+        if (recoveredEl) recoveredEl.innerText = `${currentCurrency}${(stats.returnedTotal || 0).toLocaleString()}`;
+        if (interestEl) interestEl.innerText = `+${currentCurrency}${(stats.interestEarned || 0).toLocaleString()}`;
+
+        if (pendingTag) pendingTag.innerText = `${pendingCount} Active`;
+        if (returnedTag) returnedTag.innerText = `${returnedCount} Settled`;
+
+        // Update Filter Tab Badges
+        const countAll = document.getElementById('count-all');
+        const countPending = document.getElementById('count-pending');
+        const countReturned = document.getElementById('count-returned');
+
+        if (countAll) countAll.innerText = allLentRecords.length;
+        if (countPending) countPending.innerText = pendingCount;
+        if (countReturned) countReturned.innerText = returnedCount;
+
+        renderLentTable();
+    } catch (err) {
+        console.error('Failed to load lent data:', err);
+    }
+}
+
+// Render Table with Filter
+function renderLentTable() {
+    if (!lentTbody) return;
+
+    let filtered = allLentRecords;
+    if (currentLentFilter === 'pending') {
+        filtered = allLentRecords.filter(r => r.status === 'pending');
+    } else if (currentLentFilter === 'returned') {
+        filtered = allLentRecords.filter(r => r.status === 'returned');
+    }
+
+    if (filtered.length === 0) {
+        const msg = currentLentFilter === 'all' 
+            ? 'No loan records found. Issue a new loan using the form above.'
+            : currentLentFilter === 'pending'
+                ? 'No active pending loans. All issued loans have been settled.'
+                : 'No settled loans yet. Click "Mark as Repaid" when a borrower returns funds.';
+        lentTbody.innerHTML = `<tr><td colspan="9" class="empty-cell">${msg}</td></tr>`;
+        return;
+    }
+
+    lentTbody.innerHTML = filtered.map(r => {
+        const isReturned = r.status === 'returned';
+        const calc = calcClientLoanDaysAndInterest(r.amount, r.interest_type, r.interest_rate, r.date_lent, r.date_returned, r.status);
+        const days = r.days_elapsed !== undefined ? r.days_elapsed : calc.daysElapsed;
+        const dailyRate = r.daily_interest !== undefined ? r.daily_interest : calc.dailyInterest;
+        const interestAmt = r.interest_amount !== undefined ? r.interest_amount : calc.accruedInterest;
+        const totalDue = r.total_due !== undefined ? r.total_due : calc.totalDue;
+
+        // Daily Rate Badge
+        let dailyRateHtml = '';
+        if (dailyRate > 0) {
+            dailyRateHtml = `<span class="daily-rate-tag">+${currentCurrency}${dailyRate.toFixed(2)}/day</span>`;
+        } else if (r.interest_type === 'flat' && (r.interest_rate > 0 || r.interest_amount > 0)) {
+            dailyRateHtml = `<span class="daily-rate-tag text-muted">Fixed ${currentCurrency}${r.interest_rate || r.interest_amount}</span>`;
+        } else {
+            dailyRateHtml = `<span class="lent-no-interest">0% (Zero Interest)</span>`;
+        }
+
+        // Days Active Badge
+        const daysHtml = isReturned
+            ? `<div class="days-badge days-badge-returned">${days} days (settled)</div>`
+            : `<div class="days-badge days-badge-pending">${days} day${days === 1 ? '' : 's'} active</div>`;
+
+        // Status Badge
+        const statusHtml = isReturned 
+            ? `<span class="badge tag-returned">Fully Repaid</span>` 
+            : `<span class="badge tag-pending">Pending Repayment</span>`;
+
+        // Interactive Return Settlement Button (Refined & Modern)
+        const tickBtnHtml = isReturned
+            ? `<button type="button" class="lent-settle-btn btn-settle-done" onclick="toggleLentReturn(${r.id})" title="Repaid on ${r.date_returned || 'Settled'} (Click to revert if marked by mistake)">
+                <span class="btn-check-icon">✓</span>
+                <span>Repaid (${r.date_returned || 'Settled'})</span>
+               </button>`
+            : `<button type="button" class="lent-settle-btn btn-settle-pending" onclick="toggleLentReturn(${r.id})" title="Click when borrower repays to credit funds back into balance">
+                <span class="btn-check-icon">○</span>
+                <span>Mark as Repaid</span>
+               </button>`;
+
+        return `
+            <tr class="${isReturned ? 'row-returned' : 'row-pending'}">
+                <td>
+                    <div style="font-weight: 700; color: var(--text-main); font-size: 0.95rem;">${escapeHtml(r.person_name)}</div>
+                    ${r.notes ? `<div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 2px;">💬 ${escapeHtml(r.notes)}</div>` : ''}
+                </td>
+                <td>
+                    <span class="amt-bold" style="font-size: 0.95rem;">${currentCurrency}${Number(r.amount).toLocaleString()}</span>
+                </td>
+                <td>
+                    <div style="color: var(--text-muted); font-size: 0.82rem; font-weight: 500;">${r.date_lent}</div>
+                    ${daysHtml}
+                </td>
+                <td>${dailyRateHtml}</td>
+                <td>
+                    <span class="amt-bold text-rose" style="font-size: 0.92rem;">
+                        +${currentCurrency}${Number(interestAmt).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                </td>
+                <td>
+                    <span class="amt-bold" style="color: ${isReturned ? '#10b981' : '#e11d48'}; font-size: 1.02rem;">
+                        ${currentCurrency}${Number(totalDue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                </td>
+                <td>${statusHtml}</td>
+                <td>${tickBtnHtml}</td>
+                <td>
+                    <button class="del-btn-icon" onclick="deleteLent(${r.id})" title="Delete loan record">🗑️</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Filter Tab Click Handlers
+document.querySelectorAll('.lent-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.lent-filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentLentFilter = btn.getAttribute('data-filter') || 'all';
+        renderLentTable();
+    });
+});
+
+// Toggle Lent Return Status
+window.toggleLentReturn = async function(id) {
+    if (!currentUser) return;
+    const userId = String(currentUser.id || currentUser.email);
+
+    try {
+        const res = await fetch(`${API_BASE}/api/lent/${id}/toggle`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            alert(data.error || 'Failed to update loan settlement status');
+            return;
+        }
+
+        // Live refresh of dashboard, statistics, and lent data
+        await refreshAllData();
+    } catch (err) {
+        console.error('Toggle lent error:', err);
+    }
+};
+
+// Delete Lent Record
+window.deleteLent = async function(id) {
+    if (!confirm('Are you sure you want to permanently delete this loan record?')) return;
+    if (!currentUser) return;
+    const userId = String(currentUser.id || currentUser.email);
+
+    try {
+        const res = await fetch(`${API_BASE}/api/lent/${id}?userId=${encodeURIComponent(userId)}`, {
+            method: 'DELETE'
+        });
+        if (res.ok) {
+            await refreshAllData();
+        }
+    } catch (err) {
+        console.error('Delete lent error:', err);
+    }
+};
+
+// Lent Form Submission
+if (lentForm) {
+    lentForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!currentUser) return;
+
+        const personName = (lentPersonName?.value || '').trim();
+        const amount = Number(lentAmount?.value);
+        const dateLent = (lentDateLent?.value || '').trim() || new Date().toISOString().split('T')[0];
+        const interestType = lentInterestType?.value || 'none';
+        const interestRate = Number(lentInterestVal?.value) || 0;
+        const notes = (lentNotes?.value || '').trim();
+        const userId = String(currentUser.id || currentUser.email);
+
+        if (!personName || !amount || isNaN(amount) || amount <= 0) {
+            alert('Please provide a valid borrower name and an amount greater than zero.');
+            return;
+        }
+
+        const origBtnHtml = lentSubmitBtn.innerHTML;
+        lentSubmitBtn.disabled = true;
+        lentSubmitBtn.innerHTML = '<span>⏳</span> Recording Loan...';
+
+        try {
+            const res = await fetch(`${API_BASE}/api/lent`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId,
+                    personName,
+                    amount,
+                    dateLent,
+                    interestType,
+                    interestRate,
+                    notes
+                })
+            });
+
+            const data = await res.json();
+            lentSubmitBtn.disabled = false;
+            lentSubmitBtn.innerHTML = origBtnHtml;
+
+            if (!res.ok || !data.success) {
+                alert(data.error || 'Failed to record loan');
+                return;
+            }
+
+            // Reset Form & Preview
+            lentPersonName.value = '';
+            lentAmount.value = '';
+            if (lentDateLent) lentDateLent.value = new Date().toISOString().split('T')[0];
+            lentInterestType.value = 'none';
+            if (lentInterestValGroup) lentInterestValGroup.style.display = 'none';
+            if (lentInterestVal) lentInterestVal.value = '0';
+            if (lentNotes) lentNotes.value = '';
+            updateLentPreview();
+
+            // Refresh all data
+            await refreshAllData();
+
+            // Success feedback on button
+            lentSubmitBtn.innerHTML = '<span>✓</span> Loan Recorded!';
+            setTimeout(() => {
+                lentSubmitBtn.innerHTML = origBtnHtml;
+            }, 1200);
+
+        } catch (err) {
+            console.error('Add lent error:', err);
+            lentSubmitBtn.disabled = false;
+            lentSubmitBtn.innerHTML = origBtnHtml;
+            alert('Failed to record loan. Please check your network connection.');
+        }
+    });
+}
 
 // ==================== 8. HELP CENTER & SUPPORT TICKETS ====================
 const supportTicketForm = document.getElementById('support-ticket-form');
