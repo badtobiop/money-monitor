@@ -25,9 +25,9 @@ function getLocalIpAddress(): string {
 
 // Database aur Tools
 import db from './db.js';
-import { toolsDeclaration, executeTool, getDashboardData, getStatisticsData, addExpense, addLentRecord, toggleLentStatus, getLentRecords, deleteLentRecord } from './agentTools.js';
+import { toolsDeclaration, executeTool, getDashboardData, getStatisticsData, addExpense, addLentRecord, toggleLentStatus, getLentRecords, deleteLentRecord, addBorrowedRecord, toggleBorrowedStatus, getBorrowedRecords, deleteBorrowedRecord, getMonthlyBudgetData, setMonthlyBudgetAllocations, getCalendarMonthData } from './agentTools.js';
 
-// Auto-ensure lent_records table exists
+// Auto-ensure lent_records & borrowed_records tables exist
 (async () => {
     try {
         await db.execute(`
@@ -36,6 +36,7 @@ import { toolsDeclaration, executeTool, getDashboardData, getStatisticsData, add
                 user_id TEXT NOT NULL,
                 person_name TEXT NOT NULL,
                 amount REAL NOT NULL,
+                purpose TEXT,
                 interest_type TEXT DEFAULT 'none',
                 interest_rate REAL DEFAULT 0,
                 interest_amount REAL DEFAULT 0,
@@ -47,8 +48,44 @@ import { toolsDeclaration, executeTool, getDashboardData, getStatisticsData, add
                 created_at TEXT NOT NULL
             );
         `);
+        try {
+            await db.execute('ALTER TABLE lent_records ADD COLUMN purpose TEXT;');
+        } catch (_) {}
+
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS borrowed_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                lender_name TEXT NOT NULL,
+                amount REAL NOT NULL,
+                purpose TEXT,
+                interest_type TEXT DEFAULT 'none',
+                interest_rate REAL DEFAULT 0,
+                interest_amount REAL DEFAULT 0,
+                total_due REAL NOT NULL,
+                status TEXT DEFAULT 'pending',
+                date_borrowed TEXT NOT NULL,
+                date_repaid TEXT,
+                notes TEXT,
+                created_at TEXT NOT NULL
+            );
+        `);
+
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS monthly_budgets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                month TEXT NOT NULL,
+                gross_income REAL DEFAULT 0,
+                expense_budget REAL DEFAULT 0,
+                lent_budget REAL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(user_id, month)
+            );
+        `);
     } catch (e) {
-        console.error('Table lent_records ensure error:', e);
+        console.error('Tables ensure error:', e);
     }
 })();
 
@@ -622,14 +659,46 @@ app.get('/api/dashboard/:userId', async (req: Request, res: Response) => {
     }
 });
 
-// Update Monthly Salary / Income
+// Update Monthly Salary / Income (Support Add Money / Top-up or Set Base for any target month)
 app.post('/api/user/:userId/salary', async (req: Request, res: Response) => {
     try {
         const userId = String(req.params.userId || 'default_user');
-        const { salary } = req.body;
+        const { salary, mode, month } = req.body;
         const num = Number(salary) || 0;
-        await db.prepare('UPDATE users SET monthly_salary = ? WHERE id = ? OR email = ?').run(num, userId, userId);
-        res.json({ success: true, salary: num });
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        const targetMonth = (month && String(month).length >= 7) ? String(month).slice(0, 7) : currentMonth;
+
+        // Fetch existing budget for this specific month
+        const existingBudget = await db.prepare('SELECT id, gross_income FROM monthly_budgets WHERE user_id = ? AND month = ?').get(userId, targetMonth) as { id: number; gross_income: number } | undefined;
+        const currentMonthSalary = existingBudget ? Number(existingBudget.gross_income) || 0 : 0;
+
+        let newSalary = num;
+        if (mode === 'add') {
+            newSalary = Math.round((currentMonthSalary + num) * 100) / 100;
+        }
+
+        const nowIso = new Date().toISOString();
+        if (existingBudget) {
+            await db.prepare('UPDATE monthly_budgets SET gross_income = ?, updated_at = ? WHERE id = ?').run(newSalary, nowIso, existingBudget.id);
+        } else {
+            await db.prepare('INSERT INTO monthly_budgets (user_id, month, gross_income, expense_budget, lent_budget, created_at, updated_at) VALUES (?, ?, ?, 0, 0, ?, ?)').run(userId, targetMonth, newSalary, nowIso, nowIso);
+        }
+
+        // Fetch user row
+        const userRow = await db.prepare('SELECT id, monthly_salary FROM users WHERE id = ? OR email = ?').get(userId, userId).catch(() => null) as { id: string | number; monthly_salary: number | null } | undefined;
+        if (!userRow) {
+            await db.prepare('INSERT INTO users (email, name, password, monthly_salary, created_at) VALUES (?, ?, ?, ?, ?)').run(userId, userId, 'default_placeholder_pw', newSalary, nowIso);
+        } else if (targetMonth === currentMonth) {
+            await db.prepare('UPDATE users SET monthly_salary = ? WHERE id = ? OR email = ?').run(newSalary, userId, userId);
+        }
+
+        res.json({ 
+            success: true, 
+            month: targetMonth,
+            salary: newSalary, 
+            previousSalary: currentMonthSalary, 
+            added: mode === 'add' ? num : 0 
+        });
     } catch (error) {
         console.error('Salary Update Error:', error);
         res.status(500).json({ error: 'Failed to update monthly salary' });
@@ -645,6 +714,57 @@ app.get('/api/statistics/:userId', async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Stats Error:', error);
         res.status(500).json({ error: 'Failed to fetch statistics data' });
+    }
+});
+
+// Envelope Budget Status (Three-Envelope System)
+app.get('/api/budget/:userId', async (req: Request, res: Response) => {
+    try {
+        const userId = String(req.params.userId || 'default_user');
+        const data = await getMonthlyBudgetData(userId);
+        res.json({ success: true, budget: data });
+    } catch (error) {
+        console.error('Budget Fetch Error:', error);
+        res.status(500).json({ error: 'Failed to fetch monthly budget data' });
+    }
+});
+
+app.get('/api/budget/:userId/:month', async (req: Request, res: Response) => {
+    try {
+        const userId = String(req.params.userId || 'default_user');
+        const month = String(req.params.month);
+        const data = await getMonthlyBudgetData(userId, month);
+        res.json({ success: true, budget: data });
+    } catch (error) {
+        console.error('Budget Fetch Error:', error);
+        res.status(500).json({ error: 'Failed to fetch monthly budget data' });
+    }
+});
+
+// Update Monthly Envelope Allocations
+app.post('/api/budget/:userId', async (req: Request, res: Response) => {
+    try {
+        const userId = String(req.params.userId || 'default_user');
+        const { month, grossIncome, expenseBudget, lentBudget } = req.body;
+        const targetMonth = month || new Date().toISOString().slice(0, 7);
+        const data = await setMonthlyBudgetAllocations(userId, targetMonth, Number(grossIncome), Number(expenseBudget), Number(lentBudget));
+        res.json({ success: true, budget: data });
+    } catch (error) {
+        console.error('Budget Update Error:', error);
+        res.status(500).json({ error: 'Failed to update monthly budget allocations' });
+    }
+});
+
+// Calendar & Monthly History Data
+app.get('/api/calendar/:userId/:month', async (req: Request, res: Response) => {
+    try {
+        const userId = String(req.params.userId || 'default_user');
+        const month = String(req.params.month || new Date().toISOString().slice(0, 7));
+        const data = await getCalendarMonthData(userId, month);
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('Calendar Fetch Error:', error);
+        res.status(500).json({ error: 'Failed to fetch calendar monthly archive data' });
     }
 });
 
@@ -668,11 +788,11 @@ app.post('/api/tasks/:id/toggle', async (req: Request, res: Response) => {
 // Fast Direct Add Expense API (Bypasses LLM for instant ~50ms submission)
 app.post('/api/expenses', async (req: Request, res: Response) => {
     try {
-        const { userId, title, amount, category } = req.body;
+        const { userId, title, amount, category, date } = req.body;
         if (!userId || !title || amount === undefined || amount === null) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
-        await addExpense(String(userId), String(title).trim(), Number(amount), String(category || 'General'));
+        await addExpense(String(userId), String(title).trim(), Number(amount), String(category || 'General'), date ? String(date) : undefined);
         res.json({ success: true, message: 'Expense added successfully' });
     } catch (error: any) {
         console.error('Failed to add direct expense:', error);
@@ -708,7 +828,7 @@ app.get('/api/lent/:userId', async (req: Request, res: Response) => {
 // 2. Add a new lent record
 app.post('/api/lent', async (req: Request, res: Response) => {
     try {
-        const { userId, personName, amount, interestType = 'none', interestRate = 0, notes = '', dateLent } = req.body;
+        const { userId, personName, amount, purpose = 'Personal', interestType = 'none', interestRate = 0, notes = '', dateLent } = req.body;
         if (!userId || !personName || amount === undefined || amount === null) {
             res.status(400).json({ error: 'User ID, person name, and amount are required' });
             return;
@@ -717,6 +837,7 @@ app.post('/api/lent', async (req: Request, res: Response) => {
             String(userId),
             String(personName).trim(),
             Number(amount),
+            String(purpose || 'Personal').trim(),
             String(interestType),
             Number(interestRate),
             String(notes || '').trim(),
@@ -752,6 +873,71 @@ app.delete('/api/lent/:id', async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error('Delete Lent Record Error:', error);
         res.status(500).json({ error: 'Failed to delete lent record' });
+    }
+});
+
+// ==================== MONEY BORROWED / DEBT API (UDHAR LIYA) ====================
+
+// 1. Get user's borrowed debt records and stats
+app.get('/api/borrowed/:userId', async (req: Request, res: Response) => {
+    try {
+        const userId = String(req.params.userId || 'default_user');
+        const data = await getBorrowedRecords(userId);
+        res.json({ success: true, ...data });
+    } catch (error: any) {
+        console.error('Fetch Borrowed Records Error:', error);
+        res.status(500).json({ error: 'Failed to fetch borrowed records' });
+    }
+});
+
+// 2. Add a new borrowed debt record
+app.post('/api/borrowed', async (req: Request, res: Response) => {
+    try {
+        const { userId, lenderName, amount, purpose = 'Personal', interestType = 'none', interestRate = 0, notes = '', dateBorrowed } = req.body;
+        if (!userId || !lenderName || amount === undefined || amount === null) {
+            res.status(400).json({ error: 'User ID, lender name, and amount are required' });
+            return;
+        }
+        const result = await addBorrowedRecord(
+            String(userId),
+            String(lenderName).trim(),
+            Number(amount),
+            String(purpose || 'Personal').trim(),
+            String(interestType),
+            Number(interestRate),
+            String(notes || '').trim(),
+            dateBorrowed ? String(dateBorrowed) : undefined
+        );
+        res.json(result);
+    } catch (error: any) {
+        console.error('Add Borrowed Record Error:', error);
+        res.status(500).json({ error: error?.message || 'Failed to add borrowed record' });
+    }
+});
+
+// 3. Toggle borrowed status (Mark repaid / paid off)
+app.post('/api/borrowed/:id/toggle', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { userId } = req.body;
+        const result = await toggleBorrowedStatus(Number(id), userId ? String(userId) : undefined);
+        res.json(result);
+    } catch (error: any) {
+        console.error('Toggle Borrowed Status Error:', error);
+        res.status(500).json({ error: error?.message || 'Failed to toggle borrowed status' });
+    }
+});
+
+// 4. Delete borrowed debt record
+app.delete('/api/borrowed/:id', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const userId = req.query.userId ? String(req.query.userId) : undefined;
+        await deleteBorrowedRecord(Number(id), userId);
+        res.json({ success: true });
+    } catch (error: any) {
+        console.error('Delete Borrowed Record Error:', error);
+        res.status(500).json({ error: 'Failed to delete borrowed record' });
     }
 });
 

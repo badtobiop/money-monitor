@@ -158,6 +158,14 @@
                     <div class="nav-icon-circle">🤝</div>
                     <span class="nav-label">Money Lent</span>
                 </button>
+                <button class="nav-item" data-view="view-borrowed">
+                    <div class="nav-icon-circle">📥</div>
+                    <span class="nav-label">Money Borrowed</span>
+                </button>
+                <button class="nav-item" data-view="view-calendar">
+                    <div class="nav-icon-circle">📅</div>
+                    <span class="nav-label">Calendar & History</span>
+                </button>
                 <button class="nav-item" data-view="view-settings">
                     <div class="nav-icon-circle">⚙️</div>
                     <span class="nav-label">Settings</span>
@@ -178,13 +186,25 @@
                             <div class="salary-widget-amount" id="sidebar-salary-display">₹0</div>
                         </div>
                     </div>
-                    <button class="salary-edit-btn" id="sidebar-salary-edit-btn" title="Set Monthly Salary">✏️</button>
+                    <div style="display: flex; gap: 4px; align-items: center;">
+                        <button type="button" class="salary-action-btn" id="sidebar-salary-add-toggle-btn" title="Add Money to Salary">+ Add</button>
+                        <button type="button" class="salary-edit-btn" id="sidebar-salary-edit-btn" title="Set Base Salary">✏️</button>
+                    </div>
                 </div>
                 
-                <!-- Quick Salary Edit Input Row (Toggled via edit button) -->
-                <div class="salary-input-row" id="salary-input-row" style="display: none;">
-                    <input type="number" id="sidebar-salary-input" placeholder="Enter salary (e.g. 50000)" step="100">
-                    <button id="sidebar-salary-save-btn" class="salary-save-btn">Save</button>
+                <!-- Quick Salary Edit Input Row (Toggled via edit button or + Add) -->
+                <div class="salary-input-row" id="salary-input-row" style="display: none; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; gap: 6px; align-items: center; width: 100%;">
+                        <span style="font-size: 0.72rem; color: rgba(255,255,255,0.6); white-space: nowrap;">Month:</span>
+                        <input type="month" id="sidebar-salary-month" style="flex: 1; padding: 4px 6px; font-size: 0.72rem; border-radius: 6px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); color: #fff;">
+                    </div>
+                    <div style="display: flex; gap: 6px; width: 100%;">
+                        <input type="number" id="sidebar-salary-input" placeholder="Amount (e.g. 5000)" step="50" style="flex: 1;">
+                        <div style="display: flex; gap: 4px; align-items: center;">
+                            <button type="button" id="sidebar-salary-add-btn" class="salary-save-btn" title="Add to month's salary">+ Add</button>
+                            <button type="button" id="sidebar-salary-save-btn" class="salary-save-btn btn-salary-set" title="Set exact base salary for month">Set</button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Balance / Savings Mini Summary -->
@@ -283,6 +303,177 @@
                         </div>
                         <div class="kpi-value" id="kpi-top-category">None</div>
                         <div class="kpi-note" id="kpi-top-category-note">Highest expense category</div>
+                    </div>
+                </div>
+
+                <!-- THREE-ENVELOPE CAPITAL ALLOCATION MATRIX -->
+                <div class="glass-card envelope-matrix-card">
+                    <div class="envelope-matrix-header">
+                        <div class="envelope-title-wrap">
+                            <span class="envelope-icon">💼</span>
+                            <div>
+                                <h3 class="envelope-title">Capital Allocation & Monthly Envelopes</h3>
+                                <p class="envelope-subtitle">Segregated envelopes for Living Expenses and Lending Funds deducted from Master Gross Income</p>
+                            </div>
+                        </div>
+                        <div class="envelope-actions">
+                            <span class="envelope-month-pill" id="dashboard-envelope-month">Current Month</span>
+                            <button type="button" class="btn-primary envelope-config-btn" id="open-envelope-modal-btn">
+                                <span>⚙️</span> Set Budget Envelopes
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 3 ENVELOPE CARDS -->
+                    <div class="envelope-grid">
+                        <!-- ENVELOPE 1: LIVE UPDATED MASTER SALARY BALANCE -->
+                        <div class="envelope-card envelope-master">
+                            <div class="envelope-card-top">
+                                <div class="envelope-badge-wrap">
+                                    <span class="envelope-badge badge-master">Live Updated Balance</span>
+                                </div>
+                                <span class="envelope-card-icon">🏛️</span>
+                            </div>
+                            <div class="envelope-metric-label">Remaining Available Salary</div>
+                            <div class="envelope-metric-val text-emerald" id="env-master-live-salary">₹0</div>
+                            
+                            <div class="envelope-submetrics">
+                                <div class="envelope-submetric-row">
+                                    <span>Gross Monthly Salary:</span>
+                                    <strong id="env-master-gross">₹0</strong>
+                                </div>
+                                <div class="envelope-submetric-row" id="env-master-rollover-row" style="display: none;">
+                                    <span>Last Month Rollover:</span>
+                                    <strong id="env-master-rollover-val" class="text-emerald">+₹0</strong>
+                                </div>
+                                <div class="envelope-submetric-row">
+                                    <span>Expenses Deducted:</span>
+                                    <strong id="env-master-spent-deduct" class="text-rose">-₹0</strong>
+                                </div>
+                                <div class="envelope-submetric-row">
+                                    <span>Active Loans Deducted:</span>
+                                    <strong id="env-master-lent-deduct" class="text-warning">-₹0</strong>
+                                </div>
+                            </div>
+                            <div class="envelope-status-bar">
+                                <div class="envelope-progress-track">
+                                    <div class="envelope-progress-fill fill-master" id="env-master-bar" style="width: 100%;"></div>
+                                </div>
+                                <span class="envelope-progress-text" id="env-master-pct">100% Available Balance</span>
+                            </div>
+                        </div>
+
+                        <!-- ENVELOPE 2: LIVING EXPENSES ENVELOPE -->
+                        <div class="envelope-card envelope-expense">
+                            <div class="envelope-card-top">
+                                <div class="envelope-badge-wrap">
+                                    <span class="envelope-badge badge-expense">Living Expenses Envelope</span>
+                                </div>
+                                <span class="envelope-card-icon">💳</span>
+                            </div>
+                            <div class="envelope-metric-label">Allocated Expense Budget</div>
+                            <div class="envelope-metric-val" id="env-expense-budget">₹0</div>
+
+                            <div class="envelope-submetrics">
+                                <div class="envelope-submetric-row">
+                                    <span>Actually Spent:</span>
+                                    <strong id="env-expense-spent" class="text-rose">₹0</strong>
+                                </div>
+                                <div class="envelope-submetric-row">
+                                    <span>Remaining in Envelope:</span>
+                                    <strong id="env-expense-remaining" class="text-emerald">₹0</strong>
+                                </div>
+                                <div class="envelope-submetric-row">
+                                    <span>Salary Deduction:</span>
+                                    <strong id="env-expense-impact" class="text-rose">-₹0 from salary</strong>
+                                </div>
+                            </div>
+                            <div class="envelope-status-bar">
+                                <div class="envelope-progress-track">
+                                    <div class="envelope-progress-fill fill-rose" id="env-expense-bar" style="width: 0%;"></div>
+                                </div>
+                                <span class="envelope-progress-text" id="env-expense-pct">0% Used</span>
+                            </div>
+                        </div>
+
+                        <!-- ENVELOPE 3: LENDING FUND ENVELOPE -->
+                        <div class="envelope-card envelope-lending">
+                            <div class="envelope-card-top">
+                                <div class="envelope-badge-wrap">
+                                    <span class="envelope-badge badge-lending">Lending Fund Envelope</span>
+                                </div>
+                                <span class="envelope-card-icon">🤝</span>
+                            </div>
+                            <div class="envelope-metric-label">Lending Fund Limit</div>
+                            <div class="envelope-metric-val" id="env-lending-budget">₹0</div>
+
+                            <div class="envelope-submetrics">
+                                <div class="envelope-submetric-row">
+                                    <span>Actually Lent Out:</span>
+                                    <strong id="env-lending-active" class="text-warning">₹0</strong>
+                                </div>
+                                <div class="envelope-submetric-row">
+                                    <span>Remaining Lending Capacity:</span>
+                                    <strong id="env-lending-capacity" class="text-emerald">₹0</strong>
+                                </div>
+                                <div class="envelope-submetric-row">
+                                    <span>Salary Deduction:</span>
+                                    <strong id="env-lending-impact" class="text-warning">-₹0 (Returns on repayment)</strong>
+                                </div>
+                            </div>
+                            <div class="envelope-status-bar">
+                                <div class="envelope-progress-track">
+                                    <div class="envelope-progress-fill fill-warning" id="env-lending-bar" style="width: 0%;"></div>
+                                </div>
+                                <span class="envelope-progress-text" id="env-lending-pct">0% Deployed</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MULTI-POOL FINANCIAL CAPITAL OVERVIEW BANNER -->
+                <div class="glass-card portfolio-pools-banner">
+                    <div class="pools-header">
+                        <div class="pools-title-wrap">
+                            <span class="pools-icon">🏦</span>
+                            <div>
+                                <h3 class="pools-title">Financial Capital & Balance Pools</h3>
+                                <p class="pools-subtitle">Segregated accounting for personal liquid cash, receivables, and debt liabilities</p>
+                            </div>
+                        </div>
+                        <div class="net-worth-badge" id="pool-net-worth-badge">
+                            <span class="net-worth-label">Net Financial Position:</span>
+                            <strong class="net-worth-val text-emerald" id="pool-net-worth">₹0</strong>
+                        </div>
+                    </div>
+                    <div class="pools-grid">
+                        <div class="pool-box pool-available">
+                            <div class="pool-box-header">
+                                <span class="pool-box-icon">💵</span>
+                                <span class="pool-box-tag tag-emerald">Liquid Cash</span>
+                            </div>
+                            <div class="pool-box-label">Available Main Balance</div>
+                            <div class="pool-box-val text-emerald" id="pool-available-cash">₹0</div>
+                            <div class="pool-box-note">Monthly salary minus living expenses</div>
+                        </div>
+                        <div class="pool-box pool-lent">
+                            <div class="pool-box-header">
+                                <span class="pool-box-icon">🤝</span>
+                                <span class="pool-box-tag tag-warning">Receivables</span>
+                            </div>
+                            <div class="pool-box-label">Lent Capital (Out on Loan)</div>
+                            <div class="pool-box-val text-warning" id="pool-lent-receivables">₹0</div>
+                            <div class="pool-box-note" id="pool-lent-note">₹0 principal + interest to be collected</div>
+                        </div>
+                        <div class="pool-box pool-borrowed">
+                            <div class="pool-box-header">
+                                <span class="pool-box-icon">📥</span>
+                                <span class="pool-box-tag tag-rose">Liabilities</span>
+                            </div>
+                            <div class="pool-box-label">Money Borrowed (Debt Owed)</div>
+                            <div class="pool-box-val text-rose" id="pool-debt-liabilities">₹0</div>
+                            <div class="pool-box-note" id="pool-borrowed-note">₹0 debt due to lenders</div>
+                        </div>
                     </div>
                 </div>
 
@@ -510,6 +701,23 @@
                         <span class="badge badge-rose">⚡ Real-Time Daily Accrual</span>
                     </div>
 
+                    <!-- LENDING FUND CAPACITY METER -->
+                    <div class="lending-capacity-banner" id="lending-capacity-banner">
+                        <div class="capacity-banner-left">
+                            <span class="capacity-icon">🛡️</span>
+                            <div>
+                                <div class="capacity-title">Monthly Lending Fund Envelope: <strong id="lent-envelope-budget">₹0</strong></div>
+                                <div class="capacity-subtitle">Active Principal Lent: <span id="lent-envelope-active">₹0</span> • Remaining Capacity: <strong id="lent-envelope-capacity" class="text-emerald">₹0</strong></div>
+                            </div>
+                        </div>
+                        <div class="capacity-banner-right">
+                            <div class="capacity-progress-track">
+                                <div class="capacity-progress-fill" id="lent-envelope-progress" style="width: 0%;"></div>
+                            </div>
+                            <span class="capacity-pct" id="lent-envelope-pct">0% Used</span>
+                        </div>
+                    </div>
+
                     <form id="lent-form" class="lent-form">
                         <div class="form-row-3col">
                             <div class="input-group">
@@ -519,6 +727,9 @@
                             <div class="input-group">
                                 <label for="lent-amount">Principal Borrowed *</label>
                                 <input type="number" id="lent-amount" placeholder="Principal amount (e.g. 10000)" min="1" step="0.01" required>
+                                <div id="lent-capacity-warning" class="lent-capacity-warning" style="display: none;">
+                                    ⚠️ Warning: Loan of <strong id="warn-loan-amount">₹0</strong> exceeds remaining limit (<strong id="warn-remaining-cap">₹0</strong>)!
+                                </div>
                             </div>
                             <div class="input-group">
                                 <label for="lent-date-lent">Date Issued *</label>
@@ -569,9 +780,24 @@
                             </div>
                         </div>
 
-                        <div class="input-group">
-                            <label for="lent-notes">Purpose / Reference Notes (Optional)</label>
-                            <input type="text" id="lent-notes" placeholder="e.g. Short-term business bridge loan, equipment purchase" autocomplete="off">
+                        <div class="form-row-2col">
+                            <div class="input-group">
+                                <label for="lent-purpose">Loan Purpose / Reason *</label>
+                                <select id="lent-purpose">
+                                    <option value="Personal Loan" selected>Personal / Friendly Loan</option>
+                                    <option value="Emergency Medical">Emergency & Medical Help</option>
+                                    <option value="Business / Investment">Business & Commercial Advance</option>
+                                    <option value="Education / Studies">Education & Study Expenses</option>
+                                    <option value="Travel / Commute">Travel & Ticket Advance</option>
+                                    <option value="Bill / Rent Payment">Rent & Utility Bills</option>
+                                    <option value="Shopping / Device">Shopping / Device Purchase</option>
+                                    <option value="Other">Other Purpose</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="lent-notes">Purpose Details / Notes (Optional)</label>
+                                <input type="text" id="lent-notes" placeholder="e.g. Short-term bridge, laptop repair" autocomplete="off">
+                            </div>
                         </div>
 
                         <div class="lent-form-actions">
@@ -602,6 +828,7 @@
                             <thead>
                                 <tr>
                                     <th>Borrower</th>
+                                    <th>Purpose</th>
                                     <th>Principal Borrowed</th>
                                     <th>Date Issued & Days</th>
                                     <th>Daily Accrual Rate</th>
@@ -614,7 +841,316 @@
                             </thead>
                             <tbody id="lent-tbody">
                                 <tr>
-                                    <td colspan="9" class="empty-cell">No loan records logged yet. Use the form above to record capital lent.</td>
+                                    <td colspan="10" class="empty-cell">No loan records logged yet. Use the form above to record capital lent.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: MONEY BORROWED (DEBT LIABILITIES) -->
+            <div class="view-panel" id="view-borrowed" style="display: none;">
+                <!-- KPI STATS CARDS -->
+                <div class="kpi-grid">
+                    <!-- KPI 1: Total Debt Incurred -->
+                    <div class="kpi-card card-salary">
+                        <div class="kpi-header">
+                            <span>Total Debt Incurred</span>
+                            <span class="kpi-tag tag-rose">Total Borrowed</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-borrowed-total">₹0</div>
+                        <div class="kpi-note" id="kpi-borrowed-total-note">Cumulative principal borrowed</div>
+                    </div>
+
+                    <!-- KPI 2: Active Debt Due -->
+                    <div class="kpi-card card-spent">
+                        <div class="kpi-header">
+                            <span>Active Debt Due</span>
+                            <span class="kpi-tag tag-rose" id="kpi-borrowed-pending-tag">0 Active</span>
+                        </div>
+                        <div class="kpi-value text-rose" id="kpi-borrowed-pending">₹0</div>
+                        <div class="kpi-note" id="kpi-borrowed-pending-note">Total principal + interest you owe</div>
+                    </div>
+
+                    <!-- KPI 3: Debt Settled / Paid Off -->
+                    <div class="kpi-card card-primary">
+                        <div class="kpi-header">
+                            <span>Debt Paid Off</span>
+                            <span class="kpi-tag tag-emerald" id="kpi-borrowed-repaid-tag">0 Settled</span>
+                        </div>
+                        <div class="kpi-value text-emerald" id="kpi-borrowed-repaid">₹0</div>
+                        <div class="kpi-note">Total debt cleared and repaid</div>
+                    </div>
+
+                    <!-- KPI 4: Accrued Interest Incurred -->
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span>Interest Incurred</span>
+                            <span class="kpi-tag tag-warning">Financing Cost 📉</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-borrowed-interest">₹0</div>
+                        <div class="kpi-note">Total interest accrued on debts</div>
+                    </div>
+                </div>
+
+                <!-- ADD NEW BORROWED RECORD CARD -->
+                <div class="glass-card add-card borrowed-add-card">
+                    <div class="card-heading">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.4rem;">📥</span>
+                            <div>
+                                <h3>Record Money Borrowed</h3>
+                                <span class="card-caption">Log debt liabilities, reason for taking loan, daily interest accrual, and record settlements.</span>
+                            </div>
+                        </div>
+                        <span class="badge badge-rose">⚡ Real-Time Daily Accrual</span>
+                    </div>
+
+                    <form id="borrowed-form" class="borrowed-form">
+                        <div class="form-row-3col">
+                            <div class="input-group">
+                                <label for="borrowed-lender-name">Lender / Creditor Name *</label>
+                                <input type="text" id="borrowed-lender-name" placeholder="Lender name (e.g. David, Bank, Uncle John)" required autocomplete="off">
+                            </div>
+                            <div class="input-group">
+                                <label for="borrowed-amount">Principal Borrowed *</label>
+                                <input type="number" id="borrowed-amount" placeholder="Amount borrowed (e.g. 15000)" min="1" step="0.01" required>
+                            </div>
+                            <div class="input-group">
+                                <label for="borrowed-date-borrowed">Date Borrowed *</label>
+                                <input type="date" id="borrowed-date-borrowed" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row-2col">
+                            <div class="input-group">
+                                <label for="borrowed-purpose">Borrowing Purpose / Reason *</label>
+                                <select id="borrowed-purpose">
+                                    <option value="Personal Emergency" selected>Personal Emergency Help</option>
+                                    <option value="Medical & Healthcare">Medical & Healthcare</option>
+                                    <option value="Business Expansion">Business & Commercial Advance</option>
+                                    <option value="House Rent & Deposit">House Rent & Deposit</option>
+                                    <option value="Vehicle Purchase/Repair">Vehicle Purchase or Repair</option>
+                                    <option value="Education Fees">Education & Tuition Fees</option>
+                                    <option value="Family Event / Wedding">Family Event / Wedding</option>
+                                    <option value="Shopping / Appliance">Shopping & Appliance</option>
+                                    <option value="Other">Other Purpose</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="borrowed-interest-type">Interest Accrual Model</label>
+                                <select id="borrowed-interest-type">
+                                    <option value="none" selected>Zero Interest (0%)</option>
+                                    <option value="daily_percent">Daily Percentage (% per day)</option>
+                                    <option value="monthly_percent">Monthly Percentage (% per month - Daily Pro-Rata)</option>
+                                    <option value="daily_flat">Daily Flat Fee (₹ per day)</option>
+                                    <option value="flat">One-Time Fixed Fee (₹)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row-2col">
+                            <div class="input-group" id="borrowed-interest-val-group" style="display: none;">
+                                <label for="borrowed-interest-val" id="borrowed-interest-val-label">Interest Rate / Value</label>
+                                <input type="number" id="borrowed-interest-val" placeholder="e.g. 1 for 1%/day or 2 for 2%/mo" min="0" step="any" value="0">
+                            </div>
+                            <div class="input-group">
+                                <label for="borrowed-notes">Reference Notes / Promise Details (Optional)</label>
+                                <input type="text" id="borrowed-notes" placeholder="e.g. Promised repayment next month, check #104" autocomplete="off">
+                            </div>
+                        </div>
+
+                        <!-- Live Calculation Preview Box -->
+                        <div class="lent-calc-preview" id="borrowed-calc-preview">
+                            <div class="calc-preview-grid">
+                                <div class="calc-preview-item">
+                                    <span class="calc-item-label">Principal Borrowed</span>
+                                    <strong id="borrowed-preview-principal" class="calc-item-val">₹0</strong>
+                                </div>
+                                <div class="calc-preview-item">
+                                    <span class="calc-item-label">Active Days Elapsed</span>
+                                    <span class="days-badge" id="borrowed-preview-days">0 Days</span>
+                                </div>
+                                <div class="calc-preview-item">
+                                    <span class="calc-item-label">Daily Accrual Rate</span>
+                                    <strong id="borrowed-preview-daily-rate" class="calc-item-val text-muted">₹0.00 / day</strong>
+                                </div>
+                                <div class="calc-preview-item">
+                                    <span class="calc-item-label">Accrued Interest Cost</span>
+                                    <strong id="borrowed-preview-interest" class="calc-item-val text-rose">+₹0.00</strong>
+                                </div>
+                                <div class="calc-preview-item calc-preview-highlight">
+                                    <span class="calc-item-label">Total Due to Lender</span>
+                                    <strong id="borrowed-preview-total" class="calc-item-val text-rose">₹0.00</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="lent-form-actions">
+                            <button type="submit" class="btn-primary" id="borrowed-submit-btn">
+                                <span>➕</span> Record Debt Liability
+                            </button>
+                            <span class="lent-sync-hint">💡 Interest accrues automatically every day. When you repay the lender, click <strong>"Mark as Repaid"</strong> in the ledger below to freeze interest and clear your liability.</span>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- BORROWED RECORDS PORTFOLIO LEDGER -->
+                <div class="glass-card lent-list-card">
+                    <div class="lent-list-header">
+                        <div>
+                            <h3>📋 Debt Portfolio Ledger</h3>
+                            <span class="card-caption">All borrowed liabilities, purposes, daily interest accruals, and repayment statuses</span>
+                        </div>
+                        <div class="lent-filter-tabs">
+                            <button type="button" class="borrowed-filter-btn active" data-filter="all">All (<span id="borrowed-count-all">0</span>)</button>
+                            <button type="button" class="borrowed-filter-btn" data-filter="pending">⏳ Pending (<span id="borrowed-count-pending">0</span>)</button>
+                            <button type="button" class="borrowed-filter-btn" data-filter="repaid">✅ Settled (<span id="borrowed-count-repaid">0</span>)</button>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table borrowed-table">
+                            <thead>
+                                <tr>
+                                    <th>Lender</th>
+                                    <th>Purpose</th>
+                                    <th>Principal Borrowed</th>
+                                    <th>Date Borrowed & Days</th>
+                                    <th>Daily Accrual Rate</th>
+                                    <th>Accrued Interest</th>
+                                    <th>Total Due to Lender</th>
+                                    <th>Status</th>
+                                    <th>Settlement</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="borrowed-tbody">
+                                <tr>
+                                    <td colspan="10" class="empty-cell">No debt records logged yet. Use the form above to record money borrowed.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: CALENDAR & MONTHLY HISTORICAL ARCHIVE -->
+            <div class="view-panel" id="view-calendar" style="display: none;">
+                <!-- CALENDAR TOOLBAR & MONTH SELECTOR -->
+                <div class="glass-card cal-toolbar-card">
+                    <div class="cal-nav-left">
+                        <button type="button" class="btn-secondary cal-btn" id="cal-prev-btn">◀ Previous Month</button>
+                        <div class="cal-month-display-wrap">
+                            <span class="cal-calendar-icon">📅</span>
+                            <span class="cal-active-month-text" id="cal-month-text">September 2026</span>
+                            <input type="month" id="cal-month-picker" class="cal-month-input" title="Choose Month & Year">
+                        </div>
+                        <button type="button" class="btn-secondary cal-btn" id="cal-next-btn">Next Month ▶</button>
+                    </div>
+                    <div class="cal-nav-right">
+                        <button type="button" class="btn-secondary cal-btn" id="cal-set-budget-btn">⚙️ Configure Month Salary & Envelopes</button>
+                        <button type="button" class="btn-primary cal-btn" id="cal-today-btn">Current Month</button>
+                    </div>
+                </div>
+
+                <!-- MONTH ENVELOPE SUMMARY STRIP -->
+                <div class="cal-summary-grid">
+                    <div class="kpi-card card-salary">
+                        <div class="kpi-header">
+                            <span>Month Gross Income</span>
+                            <span class="kpi-tag tag-emerald">Master</span>
+                        </div>
+                        <div class="kpi-value" id="cal-kpi-gross">₹0</div>
+                        <div class="kpi-note" id="cal-kpi-reserve">Unallocated Reserve: ₹0</div>
+                    </div>
+                    <div class="kpi-card card-spent">
+                        <div class="kpi-header">
+                            <span>Living Expenses</span>
+                            <span class="kpi-tag tag-rose" id="cal-kpi-expense-tag">0% Used</span>
+                        </div>
+                        <div class="kpi-value text-rose" id="cal-kpi-expense-spent">₹0</div>
+                        <div class="kpi-note" id="cal-kpi-expense-budget">Budget: ₹0 | Remaining: ₹0</div>
+                    </div>
+                    <div class="kpi-card card-primary">
+                        <div class="kpi-header">
+                            <span>Lending Fund</span>
+                            <span class="kpi-tag tag-warning" id="cal-kpi-lent-tag">0% Deployed</span>
+                        </div>
+                        <div class="kpi-value text-warning" id="cal-kpi-lent-active">₹0</div>
+                        <div class="kpi-note" id="cal-kpi-lent-budget">Fund: ₹0 | Remaining Limit: ₹0</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span>Net Liquid Retained</span>
+                            <span class="kpi-tag tag-emerald">Retained</span>
+                        </div>
+                        <div class="kpi-value text-emerald" id="cal-kpi-retained">₹0</div>
+                        <div class="kpi-note">Cash left across all envelopes</div>
+                    </div>
+                </div>
+
+                <!-- 7-DAY CALENDAR GRID -->
+                <div class="glass-card cal-grid-card">
+                    <div class="card-heading">
+                        <div>
+                            <h3>🗓️ Daily Financial Activity Matrix</h3>
+                            <span class="card-caption">Interactive day matrix — click any calendar date to view itemized receipts and borrowers</span>
+                        </div>
+                        <div class="cal-legend">
+                            <span class="cal-legend-item"><span class="legend-dot dot-rose"></span> Expenses</span>
+                            <span class="cal-legend-item"><span class="legend-dot dot-warning"></span> Loans Lent</span>
+                            <span class="cal-legend-item"><span class="legend-dot dot-blue"></span> Debts Borrowed</span>
+                        </div>
+                    </div>
+
+                    <div class="calendar-table-wrap">
+                        <div class="cal-weekdays-row">
+                            <div>Mon</div>
+                            <div>Tue</div>
+                            <div>Wed</div>
+                            <div>Thu</div>
+                            <div>Fri</div>
+                            <div>Sat</div>
+                            <div>Sun</div>
+                        </div>
+                        <div class="cal-days-grid" id="cal-days-grid">
+                            <!-- Injected 35 or 42 day cells -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MONTHLY DETAILED TRANSACTION ARCHIVE LEDGER -->
+                <div class="glass-card cal-ledger-card">
+                    <div class="lent-list-header">
+                        <div>
+                            <h3>📋 Itemized Monthly Ledger</h3>
+                            <span class="card-caption">Complete chronological ledger of all expenses, issued loans, and debt liabilities for this month</span>
+                        </div>
+                        <div class="lent-filter-tabs" id="cal-ledger-tabs">
+                            <button type="button" class="lent-filter-btn active" data-cal-filter="all">All (<span id="cal-count-all">0</span>)</button>
+                            <button type="button" class="lent-filter-btn" data-cal-filter="expense">💳 Expenses (<span id="cal-count-expense">0</span>)</button>
+                            <button type="button" class="lent-filter-btn" data-cal-filter="lent">🤝 Loans Lent (<span id="cal-count-lent">0</span>)</button>
+                            <button type="button" class="lent-filter-btn" data-cal-filter="borrowed">📥 Borrowed (<span id="cal-count-borrowed">0</span>)</button>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Title / Person</th>
+                                    <th>Category / Purpose</th>
+                                    <th>Amount</th>
+                                    <th>Details / Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cal-ledger-tbody">
+                                <tr>
+                                    <td colspan="6" class="empty-cell">No transactions found for this month.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -807,6 +1343,14 @@
                 <div class="nav-icon-circle">🤝</div>
                 <span class="nav-label">Lent</span>
             </button>
+            <button class="nav-item" data-view="view-borrowed">
+                <div class="nav-icon-circle">📥</div>
+                <span class="nav-label">Borrowed</span>
+            </button>
+            <button class="nav-item" data-view="view-calendar">
+                <div class="nav-icon-circle">📅</div>
+                <span class="nav-label">Calendar</span>
+            </button>
             <button class="nav-item" data-view="view-settings">
                 <div class="nav-icon-circle">⚙️</div>
                 <span class="nav-label">Settings</span>
@@ -858,9 +1402,12 @@
         <div class="drawer-chips">
             <button class="chip-item" data-text="I spent 15 on coffee">☕ Coffee $15</button>
             <button class="chip-item" data-text="I spent 80 on grocery shopping">🛒 Grocery $80</button>
-            <button class="chip-item" data-text="I lent 200 to Robert with 5% interest">🤝 Lent $200 (5% interest)</button>
+            <button class="chip-item" data-text="I lent 200 to Robert for Business with 5% interest">🤝 Lent $200 (5% interest)</button>
             <button class="chip-item" data-text="Robert has repaid the loan">✅ Robert repaid loan</button>
+            <button class="chip-item" data-text="I borrowed 500 from David for Medical Emergency">📥 Borrowed $500 (David)</button>
+            <button class="chip-item" data-text="I repaid the debt to David">✅ Repaid David debt</button>
             <button class="chip-item" data-text="Show my money lent summary">📊 Lent Summary</button>
+            <button class="chip-item" data-text="Show my borrowed debt liabilities summary">📥 Debt Summary</button>
             <button class="chip-item" data-text="What is my total expense breakdown?">📊 Expense Breakdown</button>
             <button class="chip-item" data-text="Add task: Review system design roadmap">📝 Add Task</button>
         </div>
@@ -871,6 +1418,94 @@
             <button id="drawer-send-btn" class="btn-primary drawer-send">Send</button>
         </div>
     </aside>
+
+    <!-- MODAL 1: ENVELOPE ALLOCATIONS MODAL -->
+    <div id="modal-envelope-allocations" class="auth-overlay" style="display: none;">
+        <div class="auth-card envelope-modal-card">
+            <div class="auth-header">
+                <h2>⚙️ Configure Budget Envelopes</h2>
+                <p>Divide your gross salary into Living Expenses and a strict Lending Fund limit.</p>
+            </div>
+            <form id="envelope-allocation-form" class="auth-form">
+                <div class="input-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <label for="alloc-month" style="margin-bottom: 0;">Target Month</label>
+                        <div style="display: flex; gap: 6px;">
+                            <button type="button" id="alloc-last-month-btn" style="padding: 3px 8px; font-size: 11px; background: rgba(255,255,255,0.08); border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); color: #cbd5e1; cursor: pointer;">◀ Last Month (Backfill)</button>
+                            <button type="button" id="alloc-current-month-btn" style="padding: 3px 8px; font-size: 11px; background: rgba(16,185,129,0.2); border-radius: 4px; border: 1px solid rgba(16,185,129,0.4); color: #6ee7b7; cursor: pointer;">📅 Current Month</button>
+                        </div>
+                    </div>
+                    <input type="month" id="alloc-month" required>
+                </div>
+                <div class="input-group">
+                    <label for="alloc-gross">Gross Monthly Income / Capital (₹) *</label>
+                    <input type="number" id="alloc-gross" placeholder="e.g. 50000" min="0" step="100" required>
+                </div>
+                <div class="input-group">
+                    <label for="alloc-expense">Living Expenses Budget Envelope (₹) *</label>
+                    <input type="number" id="alloc-expense" placeholder="e.g. 25000" min="0" step="100" required>
+                    <span class="input-hint">Reserved for living expenses, food, rent, shopping, and utilities</span>
+                </div>
+                <div class="input-group">
+                    <label for="alloc-lent">Lending Fund Envelope (₹) *</label>
+                    <input type="number" id="alloc-lent" placeholder="e.g. 10000" min="0" step="100" required>
+                    <span class="input-hint">Maximum limit reserved for lending to friends and contacts</span>
+                </div>
+
+                <!-- Live calculation preview in modal -->
+                <div class="alloc-calc-preview">
+                    <div class="alloc-preview-row">
+                        <span>Total Allocated:</span>
+                        <strong id="alloc-preview-total">₹0</strong>
+                    </div>
+                    <div class="alloc-preview-row">
+                        <span>Unallocated Free Cash Reserve:</span>
+                        <strong id="alloc-preview-reserve" class="text-emerald">₹0</strong>
+                    </div>
+                    <div id="alloc-warning-msg" class="alloc-warning" style="display: none;">
+                        ⚠️ Warning: Total allocated exceeds gross income!
+                    </div>
+                </div>
+
+                <div class="modal-btn-row">
+                    <button type="button" class="btn-secondary" id="close-envelope-modal-btn">Cancel</button>
+                    <button type="submit" class="btn-primary" id="save-envelope-alloc-btn">Save Allocations</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: DAY DETAIL MODAL (Itemized activity for a clicked calendar date) -->
+    <div id="modal-day-detail" class="auth-overlay" style="display: none;">
+        <div class="auth-card day-detail-modal-card">
+            <div class="auth-header">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <div>
+                        <h2 id="day-detail-title">📅 Date Details</h2>
+                        <p id="day-detail-subtitle">All activity recorded on this date</p>
+                    </div>
+                    <button type="button" class="drawer-close" id="close-day-modal-btn">✕</button>
+                </div>
+            </div>
+            <div class="day-detail-stats-bar">
+                <div class="day-stat-chip chip-rose">
+                    <span>Expenses:</span>
+                    <strong id="day-stat-expense">₹0</strong>
+                </div>
+                <div class="day-stat-chip chip-warning">
+                    <span>Loans Lent:</span>
+                    <strong id="day-stat-lent">₹0</strong>
+                </div>
+                <div class="day-stat-chip chip-primary">
+                    <span>Debts Borrowed:</span>
+                    <strong id="day-stat-borrowed">₹0</strong>
+                </div>
+            </div>
+            <div class="day-detail-list" id="day-detail-list">
+                <!-- Injected item cards -->
+            </div>
+        </div>
+    </div>
 
     <!-- SCRIPTS: LENIS (SMOOTH SCROLL) + GSAP (ANIMATIONS) + APP LOGIC -->
     <!-- Native smooth scroll enabled -->

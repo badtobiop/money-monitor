@@ -731,6 +731,8 @@ const viewMeta = {
     'view-dashboard': { title: 'Dashboard', subtitle: 'Personal overview and financial insights' },
     'view-statistics': { title: 'Statistics & Analytics', subtitle: 'Circular spending ratios across Week, Month, and Year' },
     'view-udhar': { title: 'Money Lent Ledger', subtitle: 'Manage issued capital, configure custom interest models, and reconcile repayments' },
+    'view-borrowed': { title: 'Money Borrowed (Debt Liabilities)', subtitle: 'Track loans received from creditors, monitor daily interest, and record repayments' },
+    'view-calendar': { title: 'Calendar & Monthly History', subtitle: 'Interactive daily financial activity matrix and historical month-by-month archive' },
     'view-settings': { title: 'Settings', subtitle: 'Account preferences and SQLite database configuration' },
     'view-help': { title: 'Help Center & Support', subtitle: 'Submit tickets directly to our admin desk — real-time Gmail dispatch' }
 };
@@ -776,6 +778,16 @@ document.querySelectorAll('.nav-item').forEach(item => {
             loadLentData();
         }
 
+        // If switching to borrowed, load borrowed debt records
+        if (targetView === 'view-borrowed') {
+            loadBorrowedData();
+        }
+
+        // If switching to calendar, load calendar month
+        if (targetView === 'view-calendar') {
+            loadCalendarMonth();
+        }
+
         // If switching to help, reload tickets
         if (targetView === 'view-help') {
             loadUserTickets();
@@ -798,7 +810,7 @@ async function loadDashboard() {
         // 1. Update KPI Cards & Salary Metrics
         const monthlySalary = Number(data.monthlySalary) || 0;
         const monthSpent = Number(data.monthTotal) || 0;
-        const remainingBalance = data.remainingBalance !== undefined ? Number(data.remainingBalance) : (monthlySalary > 0 ? (monthlySalary - monthSpent) : 0);
+        const remainingBalance = data.availableBalance !== undefined ? Number(data.availableBalance) : (data.remainingBalance !== undefined ? Number(data.remainingBalance) : (monthlySalary > 0 ? (monthlySalary - monthSpent) : 0));
         const savingsRate = monthlySalary > 0 ? Math.max(0, Math.round((remainingBalance / monthlySalary) * 100)) : 0;
 
         // KPI 1: Monthly Salary
@@ -808,7 +820,7 @@ async function loadDashboard() {
         // KPI 2: Spent This Month
         document.getElementById('kpi-month-spent').innerText = `${currentCurrency}${monthSpent.toLocaleString()}`;
 
-        // KPI 3: Savings Balance
+        // KPI 3: Savings Balance (Liquid Cash in Hand)
         document.getElementById('kpi-savings-balance').innerText = `${currentCurrency}${remainingBalance.toLocaleString()}`;
         const savingsTag = document.getElementById('kpi-savings-tag');
         if (monthlySalary === 0) {
@@ -824,6 +836,113 @@ async function loadDashboard() {
         document.getElementById('sidebar-salary-spent').innerText = `${currentCurrency}${monthSpent.toLocaleString()}`;
         document.getElementById('sidebar-salary-balance').innerText = `${currentCurrency}${remainingBalance.toLocaleString()}`;
         document.getElementById('sidebar-salary-progress').style.width = `${monthlySalary > 0 ? savingsRate : 0}%`;
+
+        // Multi-Pool Financial Capital Overview
+        const poolAvailable = document.getElementById('pool-available-cash');
+        const poolLent = document.getElementById('pool-lent-receivables');
+        const poolLentNote = document.getElementById('pool-lent-note');
+        const poolBorrowed = document.getElementById('pool-debt-liabilities');
+        const poolBorrowedNote = document.getElementById('pool-borrowed-note');
+        const poolNetWorth = document.getElementById('pool-net-worth');
+
+        const lentPortfolio = data.lentPortfolio || {};
+        const borrowedPortfolio = data.borrowedPortfolio || {};
+        const pendingLentDue = Number(lentPortfolio.pendingTotalDue || data.pendingLentTotalDue || 0);
+        const pendingLentPrincipal = Number(lentPortfolio.pendingPrincipal || data.pendingLent || 0);
+        const pendingBorrowedDue = Number(borrowedPortfolio.pendingTotalDue || 0);
+        const pendingBorrowedPrincipal = Number(borrowedPortfolio.pendingPrincipal || 0);
+        const netPosition = data.netFinancialPosition !== undefined ? Number(data.netFinancialPosition) : (remainingBalance + pendingLentDue - pendingBorrowedDue);
+
+        if (poolAvailable) poolAvailable.innerText = `${currentCurrency}${remainingBalance.toLocaleString()}`;
+        if (poolLent) poolLent.innerText = `${currentCurrency}${pendingLentDue.toLocaleString()}`;
+        if (poolLentNote) poolLentNote.innerText = `${currentCurrency}${pendingLentPrincipal.toLocaleString()} principal + interest`;
+        if (poolBorrowed) poolBorrowed.innerText = `${currentCurrency}${pendingBorrowedDue.toLocaleString()}`;
+        if (poolBorrowedNote) poolBorrowedNote.innerText = `${currentCurrency}${pendingBorrowedPrincipal.toLocaleString()} principal + interest`;
+        if (poolNetWorth) {
+            poolNetWorth.innerText = `${netPosition < 0 ? '-' : ''}${currentCurrency}${Math.abs(netPosition).toLocaleString()}`;
+            poolNetWorth.style.color = netPosition >= 0 ? '#10b981' : '#f43f5e';
+        }
+
+        // Three-Envelope Capital Allocation System
+        if (data.envelopes) {
+            const env = data.envelopes;
+            const exp = env.expenseEnvelope || {};
+            const lent = env.lendingEnvelope || {};
+
+            window.currentEnvelopeData = env;
+
+            // Envelope Month Pill
+            const envMonthEl = document.getElementById('dashboard-envelope-month');
+            if (envMonthEl && env.month) {
+                const [y, m] = env.month.split('-');
+                const monthName = new Date(parseInt(y), parseInt(m) - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                envMonthEl.innerText = monthName;
+            }
+
+            // Envelope 1: Live Master Salary Balance
+            const liveSalary = env.liveAvailableSalary !== undefined 
+                ? Number(env.liveAvailableSalary) 
+                : Math.max(0, (Number(env.grossIncome || 0) + Number(env.rolloverSavings || 0)) - Number(exp.spent || 0) - Number(lent.activeLent || 0));
+
+            const liveSalaryEl = document.getElementById('env-master-live-salary');
+            const grossEl = document.getElementById('env-master-gross');
+            const spentDeductEl = document.getElementById('env-master-spent-deduct');
+            const lentDeductEl = document.getElementById('env-master-lent-deduct');
+            const rolloverRow = document.getElementById('env-master-rollover-row');
+            const rolloverVal = document.getElementById('env-master-rollover-val');
+            const masterBarEl = document.getElementById('env-master-bar');
+            const masterPctEl = document.getElementById('env-master-pct');
+
+            if (liveSalaryEl) liveSalaryEl.innerText = `${currentCurrency}${liveSalary.toLocaleString()}`;
+            if (grossEl) grossEl.innerText = `${currentCurrency}${Number(env.grossIncome || 0).toLocaleString()}`;
+            if (spentDeductEl) spentDeductEl.innerText = `-${currentCurrency}${Number(exp.spent || 0).toLocaleString()}`;
+            if (lentDeductEl) lentDeductEl.innerText = `-${currentCurrency}${Number(lent.activeLent || 0).toLocaleString()}`;
+
+            const rollover = Number(env.rolloverSavings || data.rolloverSavings || 0);
+            if (rolloverRow && rolloverVal) {
+                if (rollover > 0) {
+                    rolloverRow.style.display = 'flex';
+                    rolloverVal.innerText = `+${currentCurrency}${rollover.toLocaleString()}`;
+                } else {
+                    rolloverRow.style.display = 'none';
+                }
+            }
+
+            const totalPool = (Number(env.grossIncome || 0) + rollover);
+            const retainedPct = totalPool > 0 ? Math.round((liveSalary / totalPool) * 100) : 0;
+            if (masterBarEl) masterBarEl.style.width = `${Math.min(100, Math.max(0, retainedPct))}%`;
+            if (masterPctEl) masterPctEl.innerText = `${retainedPct}% Available Balance`;
+
+            // Envelope 2: Living Expenses Envelope
+            const expBudgetEl = document.getElementById('env-expense-budget');
+            const expSpentEl = document.getElementById('env-expense-spent');
+            const expRemainingEl = document.getElementById('env-expense-remaining');
+            const expImpactEl = document.getElementById('env-expense-impact');
+            const expBarEl = document.getElementById('env-expense-bar');
+            const expPctEl = document.getElementById('env-expense-pct');
+
+            if (expBudgetEl) expBudgetEl.innerText = `${currentCurrency}${Number(exp.budget || 0).toLocaleString()}`;
+            if (expSpentEl) expSpentEl.innerText = `${currentCurrency}${Number(exp.spent || 0).toLocaleString()}`;
+            if (expRemainingEl) expRemainingEl.innerText = `${currentCurrency}${Number(exp.remaining || 0).toLocaleString()}`;
+            if (expImpactEl) expImpactEl.innerText = `-${currentCurrency}${Number(exp.spent || 0).toLocaleString()} deducted from salary`;
+            if (expBarEl) expBarEl.style.width = `${Math.min(100, Math.max(0, exp.percentage || 0))}%`;
+            if (expPctEl) expPctEl.innerText = `${exp.percentage || 0}% of budget spent (${currentCurrency}${Number(exp.remaining).toLocaleString()} envelope left)`;
+
+            // Envelope 3: Lending Fund Envelope
+            const lentBudgetEl = document.getElementById('env-lending-budget');
+            const lentActiveEl = document.getElementById('env-lending-active');
+            const lentCapacityEl = document.getElementById('env-lending-capacity');
+            const lentImpactEl = document.getElementById('env-lending-impact');
+            const lentBarEl = document.getElementById('env-lending-bar');
+            const lentPctEl = document.getElementById('env-lending-pct');
+
+            if (lentBudgetEl) lentBudgetEl.innerText = `${currentCurrency}${Number(lent.fundBudget || 0).toLocaleString()}`;
+            if (lentActiveEl) lentActiveEl.innerText = `${currentCurrency}${Number(lent.activeLent || 0).toLocaleString()}`;
+            if (lentCapacityEl) lentCapacityEl.innerText = `${currentCurrency}${Number(lent.remainingCapacity || 0).toLocaleString()}`;
+            if (lentImpactEl) lentImpactEl.innerText = `-${currentCurrency}${Number(lent.activeLent || 0).toLocaleString()} deducted (credits back when repaid)`;
+            if (lentBarEl) lentBarEl.style.width = `${Math.min(100, Math.max(0, lent.percentage || 0))}%`;
+            if (lentPctEl) lentPctEl.innerText = `${lent.percentage || 0}% deployed (${currentCurrency}${Number(lent.remainingCapacity).toLocaleString()} limit left)`;
+        }
 
         // Expenses count
         document.getElementById('expenses-count-badge').innerText = `${data.expenses.length} items`;
@@ -1049,33 +1168,43 @@ document.getElementById('quick-expense-form').addEventListener('submit', async (
 
 // ==================== MONTHLY SALARY / INCOME HANDLER ====================
 const sidebarSalaryEditBtn = document.getElementById('sidebar-salary-edit-btn');
+const sidebarSalaryAddToggleBtn = document.getElementById('sidebar-salary-add-toggle-btn');
 const kpiSalaryEditBtn = document.getElementById('kpi-salary-edit-btn');
 const salaryInputRow = document.getElementById('salary-input-row');
+const sidebarSalaryMonth = document.getElementById('sidebar-salary-month');
 const sidebarSalaryInput = document.getElementById('sidebar-salary-input');
+const sidebarSalaryAddBtn = document.getElementById('sidebar-salary-add-btn');
 const sidebarSalarySaveBtn = document.getElementById('sidebar-salary-save-btn');
 
-function toggleSalaryEdit() {
+function toggleSalaryEdit(defaultMode = 'add') {
     if (salaryInputRow.style.display === 'none' || !salaryInputRow.style.display) {
         salaryInputRow.style.display = 'flex';
+        if (sidebarSalaryMonth && !sidebarSalaryMonth.value) {
+            sidebarSalaryMonth.value = new Date().toISOString().slice(0, 7);
+        }
+        sidebarSalaryInput.placeholder = defaultMode === 'add' ? 'Add amount (e.g. 200)' : 'Set base salary (e.g. 50000)';
+        sidebarSalaryInput.dataset.defaultMode = defaultMode;
         sidebarSalaryInput.focus();
     } else {
         salaryInputRow.style.display = 'none';
     }
 }
 
-if (sidebarSalaryEditBtn) sidebarSalaryEditBtn.addEventListener('click', toggleSalaryEdit);
-if (kpiSalaryEditBtn) kpiSalaryEditBtn.addEventListener('click', toggleSalaryEdit);
+if (sidebarSalaryAddToggleBtn) sidebarSalaryAddToggleBtn.addEventListener('click', () => toggleSalaryEdit('add'));
+if (sidebarSalaryEditBtn) sidebarSalaryEditBtn.addEventListener('click', () => toggleSalaryEdit('set'));
+if (kpiSalaryEditBtn) kpiSalaryEditBtn.addEventListener('click', () => toggleSalaryEdit('add'));
 
-async function saveSalary() {
+async function submitSalary(mode = 'add') {
     const salaryVal = Number(sidebarSalaryInput.value);
-    if (isNaN(salaryVal) || salaryVal < 0 || !currentUser) return;
+    if (isNaN(salaryVal) || salaryVal <= 0 || !currentUser) return;
     const userId = String(currentUser.id || currentUser.email);
+    const month = sidebarSalaryMonth?.value || new Date().toISOString().slice(0, 7);
 
     try {
         await fetch(`${API_BASE}/api/user/${userId}/salary`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ salary: salaryVal })
+            body: JSON.stringify({ salary: salaryVal, mode, month })
         });
         salaryInputRow.style.display = 'none';
         sidebarSalaryInput.value = '';
@@ -1085,10 +1214,14 @@ async function saveSalary() {
     }
 }
 
-if (sidebarSalarySaveBtn) sidebarSalarySaveBtn.addEventListener('click', saveSalary);
+if (sidebarSalaryAddBtn) sidebarSalaryAddBtn.addEventListener('click', () => submitSalary('add'));
+if (sidebarSalarySaveBtn) sidebarSalarySaveBtn.addEventListener('click', () => submitSalary('set'));
 if (sidebarSalaryInput) {
     sidebarSalaryInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') saveSalary();
+        if (e.key === 'Enter') {
+            const mode = sidebarSalaryInput.dataset.defaultMode || 'add';
+            submitSalary(mode);
+        }
     });
 }
 
@@ -1164,7 +1297,11 @@ async function loadStatistics() {
 // Refresh All Data Helper
 async function refreshAllData() {
     // Parallel fetch: cuts dashboard refresh latency in half!
-    await Promise.all([loadDashboard(), loadStatistics(), loadLentData()]);
+    const promises = [loadDashboard(), loadStatistics(), loadLentData(), loadBorrowedData()];
+    if (typeof loadCalendarMonth === 'function' && typeof activeCalendarMonth !== 'undefined') {
+        promises.push(loadCalendarMonth(activeCalendarMonth));
+    }
+    await Promise.all(promises);
     initGsapHoverEffects();
 }
 
@@ -1434,6 +1571,7 @@ const lentForm = document.getElementById('lent-form');
 const lentPersonName = document.getElementById('lent-person-name');
 const lentAmount = document.getElementById('lent-amount');
 const lentDateLent = document.getElementById('lent-date-lent');
+const lentPurpose = document.getElementById('lent-purpose');
 const lentInterestType = document.getElementById('lent-interest-type');
 const lentInterestValGroup = document.getElementById('lent-interest-val-group');
 const lentInterestValLabel = document.getElementById('lent-interest-val-label');
@@ -1525,6 +1663,20 @@ function updateLentPreview() {
     }
     previewInterest.innerText = `+${currentCurrency}${calc.accruedInterest.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     previewTotal.innerText = `${currentCurrency}${calc.totalDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    // Check against Remaining Lending Fund Capacity
+    const remainingCap = window.currentEnvelopeData?.lendingEnvelope?.remainingCapacity;
+    const warnEl = document.getElementById('lent-capacity-warning');
+    const warnAmtEl = document.getElementById('warn-loan-amount');
+    const warnCapEl = document.getElementById('warn-remaining-cap');
+
+    if (warnEl && amount > 0 && remainingCap !== undefined && remainingCap !== null && amount > remainingCap) {
+        warnEl.style.display = 'block';
+        if (warnAmtEl) warnAmtEl.innerText = `${currentCurrency}${amount.toLocaleString()}`;
+        if (warnCapEl) warnCapEl.innerText = `${currentCurrency}${Number(remainingCap).toLocaleString()}`;
+    } else if (warnEl) {
+        warnEl.style.display = 'none';
+    }
 }
 
 // Toggle Interest Input Visibility & Labels
@@ -1591,6 +1743,22 @@ async function loadLentData() {
         if (pendingTag) pendingTag.innerText = `${pendingCount} Active`;
         if (returnedTag) returnedTag.innerText = `${returnedCount} Settled`;
 
+        // Update Lending Fund Capacity Banner
+        if (window.currentEnvelopeData && window.currentEnvelopeData.lendingEnvelope) {
+            const le = window.currentEnvelopeData.lendingEnvelope;
+            const bEl = document.getElementById('lent-envelope-budget');
+            const aEl = document.getElementById('lent-envelope-active');
+            const cEl = document.getElementById('lent-envelope-capacity');
+            const pEl = document.getElementById('lent-envelope-progress');
+            const pctEl = document.getElementById('lent-envelope-pct');
+
+            if (bEl) bEl.innerText = `${currentCurrency}${Number(le.fundBudget || 0).toLocaleString()}`;
+            if (aEl) aEl.innerText = `${currentCurrency}${Number(le.activeLent || 0).toLocaleString()}`;
+            if (cEl) cEl.innerText = `${currentCurrency}${Number(le.remainingCapacity || 0).toLocaleString()}`;
+            if (pEl) pEl.style.width = `${Math.min(100, Math.max(0, le.percentage || 0))}%`;
+            if (pctEl) pctEl.innerText = `${le.percentage || 0}% Used`;
+        }
+
         // Update Filter Tab Badges
         const countAll = document.getElementById('count-all');
         const countPending = document.getElementById('count-pending');
@@ -1623,7 +1791,7 @@ function renderLentTable() {
             : currentLentFilter === 'pending'
                 ? 'No active pending loans. All issued loans have been settled.'
                 : 'No settled loans yet. Click "Mark as Repaid" when a borrower returns funds.';
-        lentTbody.innerHTML = `<tr><td colspan="9" class="empty-cell">${msg}</td></tr>`;
+        lentTbody.innerHTML = `<tr><td colspan="10" class="empty-cell">${msg}</td></tr>`;
         return;
     }
 
@@ -1671,6 +1839,9 @@ function renderLentTable() {
                 <td>
                     <div style="font-weight: 700; color: var(--text-main); font-size: 0.95rem;">${escapeHtml(r.person_name)}</div>
                     ${r.notes ? `<div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 2px;">💬 ${escapeHtml(r.notes)}</div>` : ''}
+                </td>
+                <td>
+                    <span class="purpose-badge">${escapeHtml(r.purpose || 'Personal Loan')}</span>
                 </td>
                 <td>
                     <span class="amt-bold" style="font-size: 0.95rem;">${currentCurrency}${Number(r.amount).toLocaleString()}</span>
@@ -1761,6 +1932,7 @@ if (lentForm) {
         const personName = (lentPersonName?.value || '').trim();
         const amount = Number(lentAmount?.value);
         const dateLent = (lentDateLent?.value || '').trim() || new Date().toISOString().split('T')[0];
+        const purpose = (lentPurpose?.value || 'Personal Loan').trim();
         const interestType = lentInterestType?.value || 'none';
         const interestRate = Number(lentInterestVal?.value) || 0;
         const notes = (lentNotes?.value || '').trim();
@@ -1784,6 +1956,7 @@ if (lentForm) {
                     personName,
                     amount,
                     dateLent,
+                    purpose,
                     interestType,
                     interestRate,
                     notes
@@ -1803,6 +1976,7 @@ if (lentForm) {
             lentPersonName.value = '';
             lentAmount.value = '';
             if (lentDateLent) lentDateLent.value = new Date().toISOString().split('T')[0];
+            if (lentPurpose) lentPurpose.value = 'Personal Loan';
             lentInterestType.value = 'none';
             if (lentInterestValGroup) lentInterestValGroup.style.display = 'none';
             if (lentInterestVal) lentInterestVal.value = '0';
@@ -1823,6 +1997,360 @@ if (lentForm) {
             lentSubmitBtn.disabled = false;
             lentSubmitBtn.innerHTML = origBtnHtml;
             alert('Failed to record loan. Please check your network connection.');
+        }
+    });
+}
+
+// ==================== 7B. MONEY BORROWED / DEBT LIABILITIES KHATA ====================
+let allBorrowedRecords = [];
+let currentBorrowedFilter = 'all'; // 'all' | 'pending' | 'repaid'
+
+const borrowedForm = document.getElementById('borrowed-form');
+const borrowedLenderName = document.getElementById('borrowed-lender-name');
+const borrowedAmount = document.getElementById('borrowed-amount');
+const borrowedDateBorrowed = document.getElementById('borrowed-date-borrowed');
+const borrowedPurpose = document.getElementById('borrowed-purpose');
+const borrowedInterestType = document.getElementById('borrowed-interest-type');
+const borrowedInterestValGroup = document.getElementById('borrowed-interest-val-group');
+const borrowedInterestValLabel = document.getElementById('borrowed-interest-val-label');
+const borrowedInterestVal = document.getElementById('borrowed-interest-val');
+const borrowedNotes = document.getElementById('borrowed-notes');
+const borrowedSubmitBtn = document.getElementById('borrowed-submit-btn');
+
+const borrowedPreviewPrincipal = document.getElementById('borrowed-preview-principal');
+const borrowedPreviewDays = document.getElementById('borrowed-preview-days');
+const borrowedPreviewDailyRate = document.getElementById('borrowed-preview-daily-rate');
+const borrowedPreviewInterest = document.getElementById('borrowed-preview-interest');
+const borrowedPreviewTotal = document.getElementById('borrowed-preview-total');
+const borrowedTbody = document.getElementById('borrowed-tbody');
+
+// Initialize date picker to today's date
+if (borrowedDateBorrowed && !borrowedDateBorrowed.value) {
+    borrowedDateBorrowed.value = new Date().toISOString().split('T')[0];
+}
+
+// Real-time Preview Calculation for Borrowed Debt
+function updateBorrowedPreview() {
+    if (!borrowedPreviewPrincipal || !borrowedPreviewInterest || !borrowedPreviewTotal) return;
+    const amount = Number(borrowedAmount?.value) || 0;
+    const type = borrowedInterestType?.value || 'none';
+    const rate = Number(borrowedInterestVal?.value) || 0;
+    const dateBorrowed = borrowedDateBorrowed?.value || new Date().toISOString().split('T')[0];
+
+    const calc = calcClientLoanDaysAndInterest(amount, type, rate, dateBorrowed, null, 'pending');
+
+    borrowedPreviewPrincipal.innerText = `${currentCurrency}${amount.toLocaleString()}`;
+    if (borrowedPreviewDays) {
+        borrowedPreviewDays.innerText = calc.daysElapsed === 0 ? '0 Days (Today)' : `${calc.daysElapsed} Day${calc.daysElapsed === 1 ? '' : 's'}`;
+    }
+    if (borrowedPreviewDailyRate) {
+        borrowedPreviewDailyRate.innerText = calc.dailyInterest > 0 ? `+${currentCurrency}${calc.dailyInterest.toFixed(2)} / day` : '₹0.00 / day';
+    }
+    borrowedPreviewInterest.innerText = `+${currentCurrency}${calc.accruedInterest.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    borrowedPreviewTotal.innerText = `${currentCurrency}${calc.totalDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// Toggle Interest Input Visibility & Labels for Borrowed
+if (borrowedInterestType) {
+    borrowedInterestType.addEventListener('change', () => {
+        const val = borrowedInterestType.value;
+        if (val === 'daily_percent') {
+            borrowedInterestValGroup.style.display = 'flex';
+            borrowedInterestValLabel.innerText = 'Daily Rate (% per day)';
+            borrowedInterestVal.placeholder = 'e.g. 0.5 (for 0.5%/day)';
+        } else if (val === 'monthly_percent') {
+            borrowedInterestValGroup.style.display = 'flex';
+            borrowedInterestValLabel.innerText = 'Monthly Rate (% per month - Daily Pro-Rata)';
+            borrowedInterestVal.placeholder = 'e.g. 2 (for 2%/month)';
+        } else if (val === 'daily_flat') {
+            borrowedInterestValGroup.style.display = 'flex';
+            borrowedInterestValLabel.innerText = 'Daily Flat Fee (₹ per day)';
+            borrowedInterestVal.placeholder = 'e.g. 25 (₹25/day)';
+        } else if (val === 'flat') {
+            borrowedInterestValGroup.style.display = 'flex';
+            borrowedInterestValLabel.innerText = 'One-Time Fixed Fee (₹)';
+            borrowedInterestVal.placeholder = 'e.g. 500 (one-time)';
+        } else {
+            borrowedInterestValGroup.style.display = 'none';
+            borrowedInterestVal.value = '0';
+        }
+        updateBorrowedPreview();
+    });
+}
+
+if (borrowedAmount) borrowedAmount.addEventListener('input', updateBorrowedPreview);
+if (borrowedInterestVal) borrowedInterestVal.addEventListener('input', updateBorrowedPreview);
+if (borrowedDateBorrowed) borrowedDateBorrowed.addEventListener('input', updateBorrowedPreview);
+
+// Load Borrowed Records and Stats
+async function loadBorrowedData() {
+    if (!currentUser) return;
+    const userId = String(currentUser.id || currentUser.email);
+
+    try {
+        const res = await fetch(`${API_BASE}/api/borrowed/${encodeURIComponent(userId)}`);
+        const data = await res.json();
+        if (!data.success) return;
+
+        allBorrowedRecords = data.records || [];
+        const stats = data.stats || {};
+
+        // Update KPI Cards
+        const totalGivenEl = document.getElementById('kpi-borrowed-total');
+        const pendingEl = document.getElementById('kpi-borrowed-pending');
+        const repaidEl = document.getElementById('kpi-borrowed-repaid');
+        const interestEl = document.getElementById('kpi-borrowed-interest');
+        const pendingTag = document.getElementById('kpi-borrowed-pending-tag');
+        const repaidTag = document.getElementById('kpi-borrowed-repaid-tag');
+
+        const pendingCount = allBorrowedRecords.filter(r => r.status === 'pending').length;
+        const repaidCount = allBorrowedRecords.filter(r => r.status === 'repaid').length;
+
+        if (totalGivenEl) totalGivenEl.innerText = `${currentCurrency}${(stats.totalDebtIncurred || stats.totalBorrowedPrincipal || 0).toLocaleString()}`;
+        if (pendingEl) pendingEl.innerText = `${currentCurrency}${(stats.pendingTotalDue || stats.pendingPrincipal || 0).toLocaleString()}`;
+        if (repaidEl) repaidEl.innerText = `${currentCurrency}${(stats.repaidTotal || 0).toLocaleString()}`;
+        if (interestEl) interestEl.innerText = `+${currentCurrency}${(stats.interestIncurred || 0).toLocaleString()}`;
+
+        if (pendingTag) pendingTag.innerText = `${pendingCount} Active`;
+        if (repaidTag) repaidTag.innerText = `${repaidCount} Settled`;
+
+        // Update Filter Tab Badges
+        const countAll = document.getElementById('borrowed-count-all');
+        const countPending = document.getElementById('borrowed-count-pending');
+        const countRepaid = document.getElementById('borrowed-count-repaid');
+
+        if (countAll) countAll.innerText = allBorrowedRecords.length;
+        if (countPending) countPending.innerText = pendingCount;
+        if (countRepaid) countRepaid.innerText = repaidCount;
+
+        renderBorrowedTable();
+    } catch (err) {
+        console.error('Failed to load borrowed data:', err);
+    }
+}
+
+// Render Borrowed Debt Table with Filter
+function renderBorrowedTable() {
+    if (!borrowedTbody) return;
+
+    let filtered = allBorrowedRecords;
+    if (currentBorrowedFilter === 'pending') {
+        filtered = allBorrowedRecords.filter(r => r.status === 'pending');
+    } else if (currentBorrowedFilter === 'repaid') {
+        filtered = allBorrowedRecords.filter(r => r.status === 'repaid');
+    }
+
+    if (filtered.length === 0) {
+        const msg = currentBorrowedFilter === 'all'
+            ? 'No debt records found. Record borrowed money using the form above.'
+            : currentBorrowedFilter === 'pending'
+                ? 'No active debt liabilities. All borrowed funds have been settled!'
+                : 'No settled debts yet. Click "Mark as Repaid" when you pay back a lender.';
+        borrowedTbody.innerHTML = `<tr><td colspan="10" class="empty-cell">${msg}</td></tr>`;
+        return;
+    }
+
+    borrowedTbody.innerHTML = filtered.map(r => {
+        const isRepaid = r.status === 'repaid';
+        const calc = calcClientLoanDaysAndInterest(r.amount, r.interest_type, r.interest_rate, r.date_borrowed, r.date_repaid, r.status);
+        const days = r.days_elapsed !== undefined ? r.days_elapsed : calc.daysElapsed;
+        const dailyRate = r.daily_interest !== undefined ? r.daily_interest : calc.dailyInterest;
+        const interestAmt = r.interest_amount !== undefined ? r.interest_amount : calc.accruedInterest;
+        const totalDue = r.total_due !== undefined ? r.total_due : calc.totalDue;
+
+        // Daily Rate Badge
+        let dailyRateHtml = '';
+        if (dailyRate > 0) {
+            dailyRateHtml = `<span class="daily-rate-tag">+${currentCurrency}${dailyRate.toFixed(2)}/day</span>`;
+        } else if (r.interest_type === 'flat' && (r.interest_rate > 0 || r.interest_amount > 0)) {
+            dailyRateHtml = `<span class="daily-rate-tag text-muted">Fixed ${currentCurrency}${r.interest_rate || r.interest_amount}</span>`;
+        } else {
+            dailyRateHtml = `<span class="lent-no-interest">0% (Zero Interest)</span>`;
+        }
+
+        // Days Active Badge
+        const daysHtml = isRepaid
+            ? `<div class="days-badge days-badge-returned">${days} days (settled)</div>`
+            : `<div class="days-badge days-badge-pending">${days} day${days === 1 ? '' : 's'} active</div>`;
+
+        // Status Badge
+        const statusHtml = isRepaid 
+            ? `<span class="badge tag-returned">Fully Paid Off</span>` 
+            : `<span class="badge tag-pending">Active Liability</span>`;
+
+        // Interactive Return Settlement Button
+        const tickBtnHtml = isRepaid
+            ? `<button type="button" class="lent-settle-btn btn-settle-done" onclick="toggleBorrowedReturn(${r.id})" title="Settled on ${r.date_repaid || 'Settled'} (Click to revert if marked by mistake)">
+                <span class="btn-check-icon">✓</span>
+                <span>Paid Off (${r.date_repaid || 'Settled'})</span>
+               </button>`
+            : `<button type="button" class="lent-settle-btn btn-settle-pending" onclick="toggleBorrowedReturn(${r.id})" title="Click when you pay back the lender to clear liability">
+                <span class="btn-check-icon">○</span>
+                <span>Mark as Repaid</span>
+               </button>`;
+
+        return `
+            <tr class="${isRepaid ? 'row-returned' : 'row-pending'}">
+                <td>
+                    <div style="font-weight: 700; color: var(--text-main); font-size: 0.95rem;">${escapeHtml(r.lender_name)}</div>
+                    ${r.notes ? `<div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 2px;">💬 ${escapeHtml(r.notes)}</div>` : ''}
+                </td>
+                <td>
+                    <span class="purpose-badge purpose-borrowed">${escapeHtml(r.purpose || 'Personal Emergency')}</span>
+                </td>
+                <td>
+                    <span class="amt-bold" style="font-size: 0.95rem;">${currentCurrency}${Number(r.amount).toLocaleString()}</span>
+                </td>
+                <td>
+                    <div style="color: var(--text-muted); font-size: 0.82rem; font-weight: 500;">${r.date_borrowed}</div>
+                    ${daysHtml}
+                </td>
+                <td>${dailyRateHtml}</td>
+                <td>
+                    <span class="amt-bold text-rose" style="font-size: 0.92rem;">
+                        +${currentCurrency}${Number(interestAmt).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                </td>
+                <td>
+                    <span class="amt-bold" style="color: ${isRepaid ? '#10b981' : '#e11d48'}; font-size: 1.02rem;">
+                        ${currentCurrency}${Number(totalDue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                </td>
+                <td>${statusHtml}</td>
+                <td>${tickBtnHtml}</td>
+                <td>
+                    <button class="del-btn-icon" onclick="deleteBorrowed(${r.id})" title="Delete debt record">🗑️</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Filter Tab Click Handlers for Borrowed
+document.querySelectorAll('.borrowed-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.borrowed-filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentBorrowedFilter = btn.getAttribute('data-filter') || 'all';
+        renderBorrowedTable();
+    });
+});
+
+// Toggle Borrowed Repayment Status
+window.toggleBorrowedReturn = async function(id) {
+    if (!currentUser) return;
+    const userId = String(currentUser.id || currentUser.email);
+
+    try {
+        const res = await fetch(`${API_BASE}/api/borrowed/${id}/toggle`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            alert(data.error || 'Failed to update debt settlement status');
+            return;
+        }
+
+        await refreshAllData();
+    } catch (err) {
+        console.error('Toggle borrowed error:', err);
+    }
+};
+
+// Delete Borrowed Record
+window.deleteBorrowed = async function(id) {
+    if (!confirm('Are you sure you want to permanently delete this debt liability record?')) return;
+    if (!currentUser) return;
+    const userId = String(currentUser.id || currentUser.email);
+
+    try {
+        const res = await fetch(`${API_BASE}/api/borrowed/${id}?userId=${encodeURIComponent(userId)}`, {
+            method: 'DELETE'
+        });
+        if (res.ok) {
+            await refreshAllData();
+        }
+    } catch (err) {
+        console.error('Delete borrowed error:', err);
+    }
+};
+
+// Borrowed Form Submission
+if (borrowedForm) {
+    borrowedForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!currentUser) return;
+
+        const lenderName = (borrowedLenderName?.value || '').trim();
+        const amount = Number(borrowedAmount?.value);
+        const dateBorrowed = (borrowedDateBorrowed?.value || '').trim() || new Date().toISOString().split('T')[0];
+        const purpose = (borrowedPurpose?.value || 'Personal Emergency').trim();
+        const interestType = borrowedInterestType?.value || 'none';
+        const interestRate = Number(borrowedInterestVal?.value) || 0;
+        const notes = (borrowedNotes?.value || '').trim();
+        const userId = String(currentUser.id || currentUser.email);
+
+        if (!lenderName || !amount || isNaN(amount) || amount <= 0) {
+            alert('Please provide a valid lender name and an amount greater than zero.');
+            return;
+        }
+
+        const origBtnHtml = borrowedSubmitBtn.innerHTML;
+        borrowedSubmitBtn.disabled = true;
+        borrowedSubmitBtn.innerHTML = '<span>⏳</span> Recording Debt Liability...';
+
+        try {
+            const res = await fetch(`${API_BASE}/api/borrowed`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId,
+                    lenderName,
+                    amount,
+                    dateBorrowed,
+                    purpose,
+                    interestType,
+                    interestRate,
+                    notes
+                })
+            });
+
+            const data = await res.json();
+            borrowedSubmitBtn.disabled = false;
+            borrowedSubmitBtn.innerHTML = origBtnHtml;
+
+            if (!res.ok || !data.success) {
+                alert(data.error || 'Failed to record debt liability');
+                return;
+            }
+
+            // Reset Form & Preview
+            borrowedLenderName.value = '';
+            borrowedAmount.value = '';
+            if (borrowedDateBorrowed) borrowedDateBorrowed.value = new Date().toISOString().split('T')[0];
+            if (borrowedPurpose) borrowedPurpose.value = 'Personal Emergency';
+            borrowedInterestType.value = 'none';
+            if (borrowedInterestValGroup) borrowedInterestValGroup.style.display = 'none';
+            if (borrowedInterestVal) borrowedInterestVal.value = '0';
+            if (borrowedNotes) borrowedNotes.value = '';
+            updateBorrowedPreview();
+
+            // Refresh all data
+            await refreshAllData();
+
+            // Success feedback on button
+            borrowedSubmitBtn.innerHTML = '<span>✓</span> Debt Recorded!';
+            setTimeout(() => {
+                borrowedSubmitBtn.innerHTML = origBtnHtml;
+            }, 1200);
+
+        } catch (err) {
+            console.error('Add borrowed error:', err);
+            borrowedSubmitBtn.disabled = false;
+            borrowedSubmitBtn.innerHTML = origBtnHtml;
+            alert('Failed to record debt liability. Please check your network connection.');
         }
     });
 }
@@ -1979,6 +2507,628 @@ if (supportTicketForm) {
         }
     });
 }
+
+// ==================== 8. THREE-ENVELOPE CAPITAL ALLOCATION SYSTEM & MODAL ====================
+let currentEnvelopeData = null;
+
+const openEnvelopeModalBtn = document.getElementById('open-envelope-modal-btn');
+const closeEnvelopeModalBtn = document.getElementById('close-envelope-modal-btn');
+const modalEnvelopeAllocations = document.getElementById('modal-envelope-allocations');
+const envelopeAllocationForm = document.getElementById('envelope-allocation-form');
+const allocMonthInput = document.getElementById('alloc-month');
+const allocGrossInput = document.getElementById('alloc-gross');
+const allocExpenseInput = document.getElementById('alloc-expense');
+const allocLentInput = document.getElementById('alloc-lent');
+const allocPreviewTotal = document.getElementById('alloc-preview-total');
+const allocPreviewReserve = document.getElementById('alloc-preview-reserve');
+const allocWarningMsg = document.getElementById('alloc-warning-msg');
+const saveEnvelopeAllocBtn = document.getElementById('save-envelope-alloc-btn');
+
+function updateAllocPreview() {
+    if (!allocGrossInput || !allocExpenseInput || !allocLentInput) return;
+    const gross = Number(allocGrossInput.value) || 0;
+    const expense = Number(allocExpenseInput.value) || 0;
+    const lent = Number(allocLentInput.value) || 0;
+    const totalAllocated = expense + lent;
+    const unallocated = gross - totalAllocated;
+
+    if (allocPreviewTotal) allocPreviewTotal.innerText = `${currentCurrency}${totalAllocated.toLocaleString()}`;
+    if (allocPreviewReserve) {
+        allocPreviewReserve.innerText = `${currentCurrency}${Math.max(0, unallocated).toLocaleString()}`;
+        allocPreviewReserve.style.color = unallocated >= 0 ? '#10b981' : '#f43f5e';
+    }
+
+    if (allocWarningMsg) {
+        if (totalAllocated > gross && gross > 0) {
+            allocWarningMsg.style.display = 'block';
+            allocWarningMsg.innerText = `⚠️ Warning: Total allocated (${currentCurrency}${totalAllocated.toLocaleString()}) exceeds gross income by ${currentCurrency}${(totalAllocated - gross).toLocaleString()}!`;
+        } else {
+            allocWarningMsg.style.display = 'none';
+        }
+    }
+}
+
+if (allocGrossInput) allocGrossInput.addEventListener('input', updateAllocPreview);
+if (allocExpenseInput) allocExpenseInput.addEventListener('input', updateAllocPreview);
+if (allocLentInput) allocLentInput.addEventListener('input', updateAllocPreview);
+
+async function loadMonthIntoAllocModal(targetMonth) {
+    if (!currentUser || !allocMonthInput) return;
+    allocMonthInput.value = targetMonth;
+    const userId = String(currentUser.id || currentUser.email);
+    try {
+        const res = await fetch(`${API_BASE}/api/budget/${encodeURIComponent(userId)}/${targetMonth}`);
+        const data = await res.json();
+        if (data && data.budget) {
+            const b = data.budget;
+            if (allocGrossInput) allocGrossInput.value = b.grossIncome > 0 ? b.grossIncome : '';
+            if (allocExpenseInput) allocExpenseInput.value = b.expenseEnvelope?.budget > 0 ? b.expenseEnvelope.budget : '';
+            if (allocLentInput) allocLentInput.value = b.lendingEnvelope?.fundBudget > 0 ? b.lendingEnvelope.fundBudget : '';
+        } else {
+            if (allocGrossInput) allocGrossInput.value = '';
+            if (allocExpenseInput) allocExpenseInput.value = '';
+            if (allocLentInput) allocLentInput.value = '';
+        }
+        updateAllocPreview();
+    } catch (e) {
+        console.error('Failed to load month into modal:', e);
+    }
+}
+
+if (allocMonthInput) {
+    allocMonthInput.addEventListener('change', (e) => {
+        if (e.target.value) loadMonthIntoAllocModal(e.target.value);
+    });
+}
+
+const allocLastMonthBtn = document.getElementById('alloc-last-month-btn');
+const allocCurrentMonthBtn = document.getElementById('alloc-current-month-btn');
+const calSetBudgetBtn = document.getElementById('cal-set-budget-btn');
+
+if (allocLastMonthBtn) {
+    allocLastMonthBtn.addEventListener('click', () => {
+        const now = new Date();
+        now.setMonth(now.getMonth() - 1);
+        const lastMonthStr = now.toISOString().slice(0, 7);
+        loadMonthIntoAllocModal(lastMonthStr);
+    });
+}
+
+if (allocCurrentMonthBtn) {
+    allocCurrentMonthBtn.addEventListener('click', () => {
+        const curMonthStr = new Date().toISOString().slice(0, 7);
+        loadMonthIntoAllocModal(curMonthStr);
+    });
+}
+
+if (calSetBudgetBtn) {
+    calSetBudgetBtn.addEventListener('click', () => {
+        openEnvelopeModal(activeCalendarMonth);
+    });
+}
+
+function openEnvelopeModal(customMonth) {
+    if (!modalEnvelopeAllocations) return;
+    const targetMonth = customMonth || activeCalendarMonth || new Date().toISOString().slice(0, 7);
+    if (allocMonthInput) allocMonthInput.value = targetMonth;
+    loadMonthIntoAllocModal(targetMonth);
+    modalEnvelopeAllocations.style.display = 'flex';
+}
+
+function closeEnvelopeModal() {
+    if (modalEnvelopeAllocations) modalEnvelopeAllocations.style.display = 'none';
+}
+
+if (openEnvelopeModalBtn) openEnvelopeModalBtn.addEventListener('click', () => openEnvelopeModal());
+if (closeEnvelopeModalBtn) closeEnvelopeModalBtn.addEventListener('click', closeEnvelopeModal);
+
+if (envelopeAllocationForm) {
+    envelopeAllocationForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!currentUser) return;
+        const userId = String(currentUser.id || currentUser.email);
+
+        const month = allocMonthInput?.value || new Date().toISOString().slice(0, 7);
+        const grossIncome = Number(allocGrossInput?.value) || 0;
+        const expenseBudget = Number(allocExpenseInput?.value) || 0;
+        const lentBudget = Number(allocLentInput?.value) || 0;
+
+        const origText = saveEnvelopeAllocBtn ? saveEnvelopeAllocBtn.innerText : 'Save';
+        if (saveEnvelopeAllocBtn) {
+            saveEnvelopeAllocBtn.disabled = true;
+            saveEnvelopeAllocBtn.innerText = 'Saving Allocations... ⏳';
+        }
+
+        try {
+            const res = await fetch(`${API_BASE}/api/budget/${encodeURIComponent(userId)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    month,
+                    grossIncome,
+                    expenseBudget,
+                    lentBudget
+                })
+            });
+            const data = await res.json();
+            if (saveEnvelopeAllocBtn) {
+                saveEnvelopeAllocBtn.disabled = false;
+                saveEnvelopeAllocBtn.innerText = origText;
+            }
+
+            if (!res.ok || !data.success) {
+                alert(data.error || 'Failed to save envelope allocations');
+                return;
+            }
+
+            closeEnvelopeModal();
+            await refreshAllData();
+            if (activeCalendarMonth === month) {
+                await loadCalendarMonth(month);
+            }
+        } catch (err) {
+            console.error('Save envelopes error:', err);
+            if (saveEnvelopeAllocBtn) {
+                saveEnvelopeAllocBtn.disabled = false;
+                saveEnvelopeAllocBtn.innerText = origText;
+            }
+            alert('Failed to connect to server. Please try again.');
+        }
+    });
+}
+
+// ==================== 9. CALENDAR & MONTHLY HISTORICAL ARCHIVE ENGINE ====================
+let activeCalendarMonth = new Date().toISOString().slice(0, 7);
+window.activeCalendarMonth = activeCalendarMonth;
+let currentCalendarData = null;
+let currentCalFilter = 'all'; // 'all' | 'expense' | 'lent' | 'borrowed'
+
+const calMonthText = document.getElementById('cal-month-text');
+const calMonthPicker = document.getElementById('cal-month-picker');
+const calPrevBtn = document.getElementById('cal-prev-btn');
+const calNextBtn = document.getElementById('cal-next-btn');
+const calTodayBtn = document.getElementById('cal-today-btn');
+const calDaysGrid = document.getElementById('cal-days-grid');
+const calLedgerTbody = document.getElementById('cal-ledger-tbody');
+
+// Format YYYY-MM into Human Readable Month (e.g. "September 2026")
+function formatMonthDisplay(monthStr) {
+    if (!monthStr) return '';
+    const parts = monthStr.split('-');
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const date = new Date(year, month, 1);
+    return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+}
+
+// Shift active month by delta (+1 or -1)
+function shiftCalendarMonth(delta) {
+    const parts = (activeCalendarMonth || new Date().toISOString().slice(0, 7)).split('-');
+    let year = parseInt(parts[0], 10);
+    let month = parseInt(parts[1], 10) + delta;
+
+    if (month > 12) {
+        month = 1;
+        year += 1;
+    } else if (month < 1) {
+        month = 12;
+        year -= 1;
+    }
+
+    const newMonthStr = `${year}-${String(month).padStart(2, '0')}`;
+    loadCalendarMonth(newMonthStr);
+}
+
+if (calPrevBtn) calPrevBtn.addEventListener('click', () => shiftCalendarMonth(-1));
+if (calNextBtn) calNextBtn.addEventListener('click', () => shiftCalendarMonth(1));
+if (calTodayBtn) calTodayBtn.addEventListener('click', () => {
+    const todayMonth = new Date().toISOString().slice(0, 7);
+    loadCalendarMonth(todayMonth);
+});
+if (calMonthPicker) calMonthPicker.addEventListener('change', (e) => {
+    if (e.target.value) {
+        loadCalendarMonth(e.target.value);
+    }
+});
+
+// Load and Render Calendar Month Archive
+async function loadCalendarMonth(targetMonth) {
+    if (!currentUser) return;
+    const userId = String(currentUser.id || currentUser.email);
+    const monthStr = targetMonth || activeCalendarMonth || new Date().toISOString().slice(0, 7);
+    activeCalendarMonth = monthStr;
+    window.activeCalendarMonth = monthStr;
+
+    // Update Toolbar Display
+    if (calMonthText) calMonthText.innerText = formatMonthDisplay(monthStr);
+    if (calMonthPicker) calMonthPicker.value = monthStr;
+
+    try {
+        const res = await fetch(`${API_BASE}/api/calendar/${encodeURIComponent(userId)}/${encodeURIComponent(monthStr)}`);
+        const data = await res.json();
+        if (!data.success || !data.data) return;
+
+        currentCalendarData = data.data;
+        const b = currentCalendarData.budgetStats;
+
+        // 1. Populate Month Envelope Summary Strip
+        const grossEl = document.getElementById('cal-kpi-gross');
+        const reserveEl = document.getElementById('cal-kpi-reserve');
+        const expSpentEl = document.getElementById('cal-kpi-expense-spent');
+        const expBudgetEl = document.getElementById('cal-kpi-expense-budget');
+        const expTagEl = document.getElementById('cal-kpi-expense-tag');
+        const lentActiveEl = document.getElementById('cal-kpi-lent-active');
+        const lentBudgetEl = document.getElementById('cal-kpi-lent-budget');
+        const lentTagEl = document.getElementById('cal-kpi-lent-tag');
+        const retainedEl = document.getElementById('cal-kpi-retained');
+
+        if (b) {
+            const exp = b.expenseEnvelope || {};
+            const lent = b.lendingEnvelope || {};
+
+            if (grossEl) grossEl.innerText = `${currentCurrency}${Number(b.grossIncome || 0).toLocaleString()}`;
+            if (reserveEl) reserveEl.innerText = `Unallocated Reserve: ${currentCurrency}${Number(b.unallocatedReserve || 0).toLocaleString()}`;
+
+            if (expSpentEl) expSpentEl.innerText = `${currentCurrency}${Number(exp.spent || 0).toLocaleString()}`;
+            if (expBudgetEl) expBudgetEl.innerText = `Budget: ${currentCurrency}${Number(exp.budget || 0).toLocaleString()} | Remaining: ${currentCurrency}${Number(exp.remaining || 0).toLocaleString()}`;
+            if (expTagEl) {
+                expTagEl.innerText = `${exp.percentage || 0}% Used`;
+                expTagEl.className = exp.overspent > 0 ? 'kpi-tag tag-rose' : 'kpi-tag';
+            }
+
+            if (lentActiveEl) lentActiveEl.innerText = `${currentCurrency}${Number(lent.activeLent || 0).toLocaleString()}`;
+            if (lentBudgetEl) lentBudgetEl.innerText = `Fund: ${currentCurrency}${Number(lent.fundBudget || 0).toLocaleString()} | Remaining Limit: ${currentCurrency}${Number(lent.remainingCapacity || 0).toLocaleString()}`;
+            if (lentTagEl) {
+                lentTagEl.innerText = `${lent.percentage || 0}% Deployed`;
+                lentTagEl.className = lent.overcommitted > 0 ? 'kpi-tag tag-rose' : 'kpi-tag tag-warning';
+            }
+
+            if (retainedEl) retainedEl.innerText = `${currentCurrency}${Number(b.totalRetainedLiquid || 0).toLocaleString()}`;
+        }
+
+        // 2. Render 7-Day Calendar Grid
+        renderCalendarGrid(monthStr, currentCalendarData.days || {});
+
+        // 3. Render Itemized Monthly Ledger
+        renderCalendarLedger();
+
+    } catch (err) {
+        console.error('Failed to load calendar month:', err);
+    }
+}
+
+// Render 7-Day Matrix Grid
+function renderCalendarGrid(monthStr, daysData) {
+    if (!calDaysGrid) return;
+
+    const parts = monthStr.split('-');
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1; // 0-indexed
+
+    const firstDate = new Date(year, month, 1);
+    const lastDate = new Date(year, month + 1, 0);
+    const totalDays = lastDate.getDate();
+
+    // Determine day of week for the 1st (0=Sun, 1=Mon, ..., 6=Sat)
+    // Convert to Monday-first (0=Mon, 1=Tue, ..., 6=Sun)
+    let startDayOfWeek = (firstDate.getDay() + 6) % 7;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    let html = '';
+
+    // Days in previous month for padding
+    const prevMonthLastDate = new Date(year, month, 0).getDate();
+    for (let i = 0; i < startDayOfWeek; i++) {
+        const prevDayNum = prevMonthLastDate - startDayOfWeek + i + 1;
+        html += `
+            <div class="cal-day-cell other-month">
+                <div class="cal-day-header">
+                    <span class="cal-day-num">${prevDayNum}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // Days in current active month
+    for (let day = 1; day <= totalDays; day++) {
+        const dayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const isToday = dayStr === todayStr;
+        const activity = daysData[dayStr];
+
+        let badgesHtml = '';
+        let totalItems = 0;
+
+        if (activity) {
+            const expCount = (activity.expenses || []).length;
+            const lentCount = (activity.lent || []).length;
+            const borrowedCount = (activity.borrowed || []).length;
+            totalItems = expCount + lentCount + borrowedCount;
+
+            if (activity.totalExpense > 0) {
+                badgesHtml += `<div class="cal-chip chip-expense" title="${expCount} expense(s)">💳 ${currentCurrency}${Math.round(activity.totalExpense).toLocaleString()}</div>`;
+            }
+            if (activity.totalLent > 0) {
+                badgesHtml += `<div class="cal-chip chip-lent" title="${lentCount} loan(s) issued">🤝 ${currentCurrency}${Math.round(activity.totalLent).toLocaleString()}</div>`;
+            }
+            if (activity.totalBorrowed > 0) {
+                badgesHtml += `<div class="cal-chip chip-borrowed" title="${borrowedCount} debt(s)">📥 ${currentCurrency}${Math.round(activity.totalBorrowed).toLocaleString()}</div>`;
+            }
+        }
+
+        const cellClasses = [
+            'cal-day-cell',
+            isToday ? 'is-today' : '',
+            activity && totalItems > 0 ? 'has-activity' : ''
+        ].filter(Boolean).join(' ');
+
+        html += `
+            <div class="${cellClasses}" data-date="${dayStr}">
+                <div class="cal-day-header">
+                    <span class="cal-day-num">${day}</span>
+                    ${totalItems > 0 ? `<span class="cal-activity-count">${totalItems} item${totalItems === 1 ? '' : 's'}</span>` : ''}
+                </div>
+                <div class="cal-day-badges">
+                    ${badgesHtml}
+                </div>
+            </div>
+        `;
+    }
+
+    // Days in next month for trailing padding (to reach 35 or 42 grid cells)
+    const filledCount = startDayOfWeek + totalDays;
+    const totalSlots = filledCount <= 35 ? 35 : 42;
+    const trailingDays = totalSlots - filledCount;
+
+    for (let day = 1; day <= trailingDays; day++) {
+        html += `
+            <div class="cal-day-cell other-month">
+                <div class="cal-day-header">
+                    <span class="cal-day-num">${day}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    calDaysGrid.innerHTML = html;
+
+    // Attach click listeners to open Day Detail Modal
+    calDaysGrid.querySelectorAll('.cal-day-cell:not(.other-month)').forEach(cell => {
+        cell.addEventListener('click', () => {
+            const dateStr = cell.getAttribute('data-date');
+            if (dateStr && currentCalendarData) {
+                const dayAct = (currentCalendarData.days && currentCalendarData.days[dateStr]) || {
+                    date: dateStr,
+                    expenses: [],
+                    lent: [],
+                    borrowed: [],
+                    totalExpense: 0,
+                    totalLent: 0,
+                    totalBorrowed: 0
+                };
+                openDayDetailModal(dateStr, dayAct);
+            }
+        });
+    });
+}
+
+// Render Monthly Chronological Ledger
+function renderCalendarLedger() {
+    if (!calLedgerTbody || !currentCalendarData) return;
+
+    const raw = currentCalendarData.raw || {};
+    const items = [];
+
+    // 1. Expenses
+    (raw.expenses || []).forEach(e => {
+        items.push({
+            id: `exp-${e.id}`,
+            type: 'expense',
+            date: e.date ? e.date.split('T')[0] : '',
+            title: e.title,
+            category: e.category || 'General',
+            amount: Number(e.amount) || 0,
+            status: 'Settled',
+            raw: e
+        });
+    });
+
+    // 2. Lent Loans
+    (raw.lentRecords || []).forEach(l => {
+        items.push({
+            id: `lent-${l.id}`,
+            type: 'lent',
+            date: l.date_lent ? l.date_lent.split('T')[0] : '',
+            title: l.person_name,
+            category: l.purpose || 'Personal Loan',
+            amount: Number(l.amount) || 0,
+            status: l.status === 'returned' ? `Settled (${l.date_returned || 'Repaid'})` : 'Active / Pending Repayment',
+            raw: l
+        });
+    });
+
+    // 3. Borrowed Debts
+    (raw.borrowedRecords || []).forEach(b => {
+        items.push({
+            id: `borrowed-${b.id}`,
+            type: 'borrowed',
+            date: b.date_borrowed ? b.date_borrowed.split('T')[0] : '',
+            title: b.lender_name,
+            category: b.purpose || 'Debt Liability',
+            amount: Number(b.amount) || 0,
+            status: b.status === 'repaid' ? `Settled (${b.date_repaid || 'Paid'})` : 'Active / Due to Lender',
+            raw: b
+        });
+    });
+
+    // Sort descending by date
+    items.sort((a, b) => b.date.localeCompare(a.date));
+
+    // Update Counts on Filter Tabs
+    const expItems = items.filter(i => i.type === 'expense');
+    const lentItems = items.filter(i => i.type === 'lent');
+    const borrowedItems = items.filter(i => i.type === 'borrowed');
+
+    const countAllEl = document.getElementById('cal-count-all');
+    const countExpEl = document.getElementById('cal-count-expense');
+    const countLentEl = document.getElementById('cal-count-lent');
+    const countBorrowedEl = document.getElementById('cal-count-borrowed');
+
+    if (countAllEl) countAllEl.innerText = items.length;
+    if (countExpEl) countExpEl.innerText = expItems.length;
+    if (countLentEl) countLentEl.innerText = lentItems.length;
+    if (countBorrowedEl) countBorrowedEl.innerText = borrowedItems.length;
+
+    // Filter Items
+    let filtered = items;
+    if (currentCalFilter === 'expense') filtered = expItems;
+    else if (currentCalFilter === 'lent') filtered = lentItems;
+    else if (currentCalFilter === 'borrowed') filtered = borrowedItems;
+
+    if (filtered.length === 0) {
+        calLedgerTbody.innerHTML = `<tr><td colspan="6" class="empty-cell">No ${currentCalFilter === 'all' ? '' : currentCalFilter} activity recorded for ${formatMonthDisplay(activeCalendarMonth)}.</td></tr>`;
+        return;
+    }
+
+    calLedgerTbody.innerHTML = filtered.map(item => {
+        let typeBadge = '';
+        let amtClass = '';
+
+        if (item.type === 'expense') {
+            typeBadge = `<span class="cal-chip chip-expense">💳 Expense</span>`;
+            amtClass = 'text-rose';
+        } else if (item.type === 'lent') {
+            typeBadge = `<span class="cal-chip chip-lent">🤝 Loan Lent</span>`;
+            amtClass = 'text-warning';
+        } else if (item.type === 'borrowed') {
+            typeBadge = `<span class="cal-chip chip-borrowed">📥 Borrowed</span>`;
+            amtClass = 'text-primary';
+        }
+
+        return `
+            <tr>
+                <td style="font-weight: 600; color: #475569; font-size: 0.85rem;">${item.date}</td>
+                <td>${typeBadge}</td>
+                <td><strong>${escapeHtml(item.title)}</strong></td>
+                <td><span class="cat-badge">${escapeHtml(item.category)}</span></td>
+                <td><span class="amt-bold ${amtClass}">${currentCurrency}${item.amount.toLocaleString()}</span></td>
+                <td><span style="font-size: 0.82rem; color: #64748b;">${escapeHtml(item.status)}</span></td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Calendar Filter Tabs Listener
+document.querySelectorAll('#cal-ledger-tabs .lent-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('#cal-ledger-tabs .lent-filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentCalFilter = btn.getAttribute('data-cal-filter') || 'all';
+        renderCalendarLedger();
+    });
+});
+
+// ==================== 10. DAY DETAIL MODAL ====================
+const modalDayDetail = document.getElementById('modal-day-detail');
+const closeDayModalBtn = document.getElementById('close-day-modal-btn');
+const dayDetailTitle = document.getElementById('day-detail-title');
+const dayDetailSubtitle = document.getElementById('day-detail-subtitle');
+const dayStatExpense = document.getElementById('day-stat-expense');
+const dayStatLent = document.getElementById('day-stat-lent');
+const dayStatBorrowed = document.getElementById('day-stat-borrowed');
+const dayDetailList = document.getElementById('day-detail-list');
+
+function openDayDetailModal(dateStr, dayData) {
+    if (!modalDayDetail) return;
+
+    const formattedDate = new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+    });
+
+    if (dayDetailTitle) dayDetailTitle.innerText = `📅 ${formattedDate}`;
+    if (dayDetailSubtitle) dayDetailSubtitle.innerText = `Full activity report for ${dateStr}`;
+
+    if (dayStatExpense) dayStatExpense.innerText = `${currentCurrency}${Number(dayData.totalExpense || 0).toLocaleString()}`;
+    if (dayStatLent) dayStatLent.innerText = `${currentCurrency}${Number(dayData.totalLent || 0).toLocaleString()}`;
+    if (dayStatBorrowed) dayStatBorrowed.innerText = `${currentCurrency}${Number(dayData.totalBorrowed || 0).toLocaleString()}`;
+
+    const expenses = dayData.expenses || [];
+    const lent = dayData.lent || [];
+    const borrowed = dayData.borrowed || [];
+
+    if (expenses.length === 0 && lent.length === 0 && borrowed.length === 0) {
+        if (dayDetailList) {
+            dayDetailList.innerHTML = `<div class="empty-cell" style="padding: 24px;">No transactions recorded on this date.</div>`;
+        }
+    } else {
+        let itemsHtml = '';
+
+        expenses.forEach(e => {
+            itemsHtml += `
+                <div class="day-detail-item">
+                    <div class="day-item-left">
+                        <div class="day-item-icon icon-exp">💳</div>
+                        <div>
+                            <div class="day-item-title">${escapeHtml(e.title)}</div>
+                            <div class="day-item-meta">Expense • ${escapeHtml(e.category || 'General')}</div>
+                        </div>
+                    </div>
+                    <div class="day-item-amount text-rose">
+                        -${currentCurrency}${Number(e.amount).toLocaleString()}
+                    </div>
+                </div>
+            `;
+        });
+
+        lent.forEach(l => {
+            const isSettled = l.status === 'returned';
+            itemsHtml += `
+                <div class="day-detail-item">
+                    <div class="day-item-left">
+                        <div class="day-item-icon icon-lent">🤝</div>
+                        <div>
+                            <div class="day-item-title">Lent to ${escapeHtml(l.person_name)}</div>
+                            <div class="day-item-meta">Loan • ${escapeHtml(l.purpose || 'Personal')} • Status: <strong>${isSettled ? 'Settled' : 'Pending'}</strong></div>
+                        </div>
+                    </div>
+                    <div class="day-item-amount text-warning">
+                        ${currentCurrency}${Number(l.amount).toLocaleString()}
+                    </div>
+                </div>
+            `;
+        });
+
+        borrowed.forEach(b => {
+            const isSettled = b.status === 'repaid';
+            itemsHtml += `
+                <div class="day-detail-item">
+                    <div class="day-item-left">
+                        <div class="day-item-icon icon-borrowed">📥</div>
+                        <div>
+                            <div class="day-item-title">Borrowed from ${escapeHtml(b.lender_name)}</div>
+                            <div class="day-item-meta">Debt • ${escapeHtml(b.purpose || 'Personal')} • Status: <strong>${isSettled ? 'Repaid' : 'Pending Due'}</strong></div>
+                        </div>
+                    </div>
+                    <div class="day-item-amount text-primary">
+                        ${currentCurrency}${Number(b.amount).toLocaleString()}
+                    </div>
+                </div>
+            `;
+        });
+
+        if (dayDetailList) dayDetailList.innerHTML = itemsHtml;
+    }
+
+    modalDayDetail.style.display = 'flex';
+}
+
+function closeDayDetailModal() {
+    if (modalDayDetail) modalDayDetail.style.display = 'none';
+}
+
+if (closeDayModalBtn) closeDayModalBtn.addEventListener('click', closeDayDetailModal);
 
 // Boot Check
 checkAuth();
